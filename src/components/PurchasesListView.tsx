@@ -11,7 +11,9 @@ import {
   Trash2,
   Edit,
   PlusCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 
 interface PurchasesListViewProps {
@@ -30,12 +32,17 @@ export const PurchasesListView: React.FC<PurchasesListViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSource, setFilterSource] = useState<string>('all');
   const [filterTempo, setFilterTempo] = useState<string>('all');
+  const [filterReceipt, setFilterReceipt] = useState<string>('all'); // 'all' | 'has_receipt' | 'no_receipt'
 
   const filtered = purchases.filter(p => {
     if (selectedOutletId !== 'all' && p.outlet_id !== selectedOutletId) return false;
     if (filterSource !== 'all' && p.payment_source !== filterSource) return false;
     if (filterTempo === 'tempo_only' && !p.is_tempo) return false;
     if (filterTempo === 'tempo_unpaid' && (!p.is_tempo || p.tempo_status !== 'unpaid')) return false;
+
+    // Filter Foto Nota
+    if (filterReceipt === 'has_receipt' && !p.receipt_image_url) return false;
+    if (filterReceipt === 'no_receipt' && p.receipt_image_url) return false;
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -49,18 +56,23 @@ export const PurchasesListView: React.FC<PurchasesListViewProps> = ({
   });
 
   const totalAmountFiltered = filtered.reduce((acc, curr) => acc + curr.total_amount, 0);
+  const totalWithReceiptCount = purchases.filter(p => p.receipt_image_url).length;
+  const totalWithoutReceiptCount = purchases.filter(p => !p.receipt_image_url).length;
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-20 sm:pb-12">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-6 border-3 sm:border-4 border-black shadow-[3px_3px_0px_#121212] sm:shadow-[5px_5px_0px_#121212]">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-lg sm:text-2xl font-black text-black uppercase tracking-tight">
-              Data Belanja & Nota
+              Data Belanja & Nota Fisik
             </h1>
             <span className="px-2 py-0.5 bg-[#00F0FF] border-2 border-black text-black text-[10px] sm:text-xs font-black uppercase">
               {filtered.length} Transaksi
+            </span>
+            <span className="px-2 py-0.5 bg-[#FFE600] border-2 border-black text-black text-[10px] sm:text-xs font-black uppercase">
+              📸 {totalWithReceiptCount} Ada Nota
             </span>
           </div>
           <p className="text-xs sm:text-sm font-bold text-black/70 mt-1">
@@ -88,8 +100,8 @@ export const PurchasesListView: React.FC<PurchasesListViewProps> = ({
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 bg-white p-3 sm:p-4 border-3 border-black shadow-[3px_3px_0px_#121212]">
+      {/* Filters Bar with Receipt Status Switcher */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 bg-white p-3 sm:p-4 border-3 border-black shadow-[3px_3px_0px_#121212]">
         <div className="relative col-span-2 sm:col-span-1">
           <input
             type="text"
@@ -129,6 +141,19 @@ export const PurchasesListView: React.FC<PurchasesListViewProps> = ({
           </select>
         </div>
 
+        {/* Filter Status Foto Nota */}
+        <div>
+          <select
+            value={filterReceipt}
+            onChange={(e) => setFilterReceipt(e.target.value)}
+            className="w-full bg-[#FFFDF5] border-2 border-black px-2 py-1.5 text-xs font-bold text-black focus:outline-none font-black text-emerald-800"
+          >
+            <option value="all">Semua Foto Nota</option>
+            <option value="has_receipt">📸 Sudah Ada Foto Nota ({totalWithReceiptCount})</option>
+            <option value="no_receipt">⚠️ Belum Ada Foto Nota ({totalWithoutReceiptCount})</option>
+          </select>
+        </div>
+
         <div className="col-span-2 sm:col-span-1">
           <select
             value={filterTempo}
@@ -142,7 +167,7 @@ export const PurchasesListView: React.FC<PurchasesListViewProps> = ({
         </div>
       </div>
 
-      {/* List */}
+      {/* List Transaksi */}
       {filtered.length === 0 ? (
         <div className="p-8 sm:p-12 text-center bg-white border-3 border-black shadow-[3px_3px_0px_#121212] text-black font-bold text-xs">
           Tidak ada transaksi belanja yang sesuai filter.
@@ -151,6 +176,7 @@ export const PurchasesListView: React.FC<PurchasesListViewProps> = ({
         <div className="space-y-3">
           {filtered.map((p) => {
             const outlet = outlets.find(o => o.id === p.outlet_id);
+            const hasReceipt = Boolean(p.receipt_image_url);
 
             return (
               <div
@@ -166,6 +192,20 @@ export const PurchasesListView: React.FC<PurchasesListViewProps> = ({
                     <span className="text-[10px] font-bold text-black/70">
                       {formatDateIndo(p.purchase_date)}
                     </span>
+
+                    {/* BADGE STATUS FOTO NOTA FISIK */}
+                    {hasReceipt ? (
+                      <span className="text-[9px] sm:text-[10px] px-2 py-0.5 border-2 border-black bg-[#00F0FF] text-black font-black uppercase flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3 stroke-[2.5]" />
+                        <span>Ada Nota Fisik</span>
+                      </span>
+                    ) : (
+                      <span className="text-[9px] sm:text-[10px] px-2 py-0.5 border border-black bg-[#FFFDF5] text-black/60 font-bold uppercase flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        <span>Tanpa Foto Nota</span>
+                      </span>
+                    )}
+
                     {p.is_tempo && (
                       <span className={`text-[9px] px-1.5 py-0.2 border border-black font-black uppercase ${
                         p.tempo_status === 'paid'
@@ -209,15 +249,16 @@ export const PurchasesListView: React.FC<PurchasesListViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Action Buttons: Nota, Edit, Hapus */}
+                  {/* Action Buttons: Nota Preview, Edit, Hapus */}
                   <div className="flex items-center gap-1.5">
-                    {p.receipt_image_url && (
+                    {hasReceipt && (
                       <button
-                        onClick={() => onViewReceipt(p.receipt_image_url!, `Nota ${p.supplier_name} (${outlet?.name})`)}
-                        className="p-2 bg-[#FFE600] border-2 border-black shadow-[2px_2px_0px_#121212] hover:bg-[#ffd900] active:translate-x-[1px] active:translate-y-[1px]"
-                        title="Lihat Foto Nota"
+                        onClick={() => onViewReceipt(p.receipt_image_url!, `Nota ${p.supplier_name} (${outlet?.name}) - ${formatRupiah(p.total_amount)}`)}
+                        className="p-2 bg-[#FFE600] border-2 border-black shadow-[2px_2px_0px_#121212] hover:bg-[#ffd900] active:translate-x-[1px] active:translate-y-[1px] flex items-center gap-1 text-xs font-black uppercase"
+                        title="Lihat & Perbesar Foto Nota"
                       >
                         <Receipt className="h-4 w-4 stroke-[2.5]" />
+                        <span className="hidden sm:inline">Lihat Nota</span>
                       </button>
                     )}
 

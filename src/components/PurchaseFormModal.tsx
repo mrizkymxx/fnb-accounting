@@ -4,13 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Purchase, PurchaseItem, PaymentSource } from '@/types/database';
 import { formatRupiah } from '@/lib/formatters';
+import { compressReceiptImage } from '@/lib/imageCompressor';
 import {
   X,
   Plus,
   Trash2,
   Camera,
   AlertCircle,
-  Layers,
   Sparkles
 } from 'lucide-react';
 
@@ -32,7 +32,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   const [supplierName, setSupplierName] = useState<string>('');
   const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [paymentSource, setPaymentSource] = useState<PaymentSource>('advance_transfer');
-  const [advanceBatchId, setAdvanceBatchId] = useState<string>('auto_fifo'); // Default to auto_fifo (Kumpulan Sisa)
+  const [advanceBatchId, setAdvanceBatchId] = useState<string>('auto_fifo');
   const [isTempo, setIsTempo] = useState<boolean>(false);
   const [tempoDays, setTempoDays] = useState<number>(14);
   const [tempoDueDate, setTempoDueDate] = useState<string>(
@@ -40,12 +40,12 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   );
   const [notes, setNotes] = useState<string>('');
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   const [items, setItems] = useState<PurchaseItem[]>([
     { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
   ]);
 
-  // Load initialData when editing
   useEffect(() => {
     if (initialData) {
       setOutletId(initialData.outlet_id);
@@ -134,15 +134,20 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
   const totalCalculated = items.reduce((acc, curr) => acc + (curr.subtotal || 0), 0);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Kompresi foto nota otomatis (kamera iPhone 8MB -> 100KB ultra tajam)
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setReceiptImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      setIsCompressing(true);
+      const compressedBase64 = await compressReceiptImage(file, 1200, 0.72);
+      setReceiptImage(compressedBase64);
+    } catch (err) {
+      console.error('Gagal kompres gambar:', err);
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -154,12 +159,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     if (validItems.length === 0) {
       alert('Mohon isi minimal 1 nama barang belanjaan.');
       return;
-    }
-
-    if (paymentSource === 'advance_transfer' && totalOutletRemaining < totalCalculated && !initialData) {
-      if (!confirm(`Total belanja (${formatRupiah(totalCalculated)}) lebih besar dari sisa dana mengendap (${formatRupiah(totalOutletRemaining)}). Tetap lanjutkan?`)) {
-        return;
-      }
     }
 
     const payload = {
@@ -371,7 +370,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                     </div>
 
                     <div className="space-y-1.5">
-                      {/* Opsi 1: Kumpulan Sisa (Auto FIFO) */}
                       <label
                         className={`p-2.5 border-2 border-black cursor-pointer flex items-center justify-between gap-2 transition-all ${
                           advanceBatchId === 'auto_fifo'
@@ -403,7 +401,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                         </span>
                       </label>
 
-                      {/* Opsi 2: Pilih Batch Tertentu */}
                       {outletAdvanceBatches.map((b) => (
                         <label
                           key={b.id}
@@ -575,20 +572,21 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             </div>
           </div>
 
-          {/* Upload Foto Nota */}
+          {/* Upload Foto Nota (Auto-Compressed) */}
           <div className="space-y-1.5">
             <label className="block text-xs font-black text-black uppercase">
-              Foto Nota Fisik (iPhone / MacBook)
+              Foto Bukti Nota Fisik (Otomatis Dikompres Ringan & Tajam)
             </label>
             <div className="flex flex-col sm:flex-row items-center gap-2">
               <label className="w-full sm:w-auto flex-1 cursor-pointer flex items-center justify-center gap-2 p-2.5 sm:p-3 bg-white border-3 border-black shadow-[2px_2px_0px_#121212] text-xs font-black uppercase">
                 <Camera className="h-4 w-4 stroke-[2.5]" />
-                <span>Foto Struk / Nota</span>
+                <span>{isCompressing ? 'Mengompres Foto...' : 'Foto / Upload Struk'}</span>
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
                   onChange={handleImageChange}
+                  disabled={isCompressing}
                   className="hidden"
                 />
               </label>
@@ -640,7 +638,8 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 border-3 border-black bg-[#00F0FF] text-black text-xs font-black uppercase shadow-[3px_3px_0px_#121212] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all"
+              disabled={isCompressing}
+              className="px-5 py-2 border-3 border-black bg-[#00F0FF] text-black text-xs font-black uppercase shadow-[3px_3px_0px_#121212] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all disabled:opacity-50"
             >
               {initialData ? 'Simpan Perubahan' : 'Simpan Belanja'}
             </button>
