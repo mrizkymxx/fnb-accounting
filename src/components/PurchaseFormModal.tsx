@@ -14,7 +14,7 @@ import {
   AlertCircle,
   Sparkles,
   Loader2,
-  Wand2
+  CheckCircle2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -46,6 +46,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isScanningAI, setIsScanningAI] = useState(false);
+  const [aiScanStatus, setAiScanStatus] = useState<string | null>(null);
 
   const [items, setItems] = useState<PurchaseItem[]>([
     { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
@@ -63,6 +64,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       setTempoDueDate(initialData.tempo_due_date || '');
       setNotes(initialData.notes || '');
       setReceiptImage(initialData.receipt_image_url || null);
+      setAiScanStatus(null);
       setItems(initialData.items && initialData.items.length > 0 ? initialData.items : [
         { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
       ]);
@@ -76,6 +78,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       setIsTempo(false);
       setNotes('');
       setReceiptImage(null);
+      setAiScanStatus(null);
       setItems([{ id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }]);
     }
   }, [initialData, isOpen, selectedOutletId, outlets]);
@@ -147,6 +150,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     try {
       setIsUploading(true);
       setIsScanningAI(true);
+      setAiScanStatus('Sedang mengompres & menganalisis struk...');
 
       // 1. Dapatkan base64 terkompresi
       const compressedBase64 = await compressReceiptImage(file, 1200, 0.72);
@@ -167,42 +171,53 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
         body: JSON.stringify({ imageBase64: compressedBase64 })
       });
 
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data) {
-          const aiData = json.data;
+      const json = await res.json();
 
-          if (aiData.supplier_name && !supplierName) {
-            setSupplierName(aiData.supplier_name);
-          }
-          if (aiData.purchase_date) {
-            setPurchaseDate(aiData.purchase_date);
-          }
-          if (aiData.notes && !notes) {
-            setNotes(aiData.notes);
-          }
-          if (Array.isArray(aiData.items) && aiData.items.length > 0) {
-            setItems(aiData.items.map((it: any, idx: number) => ({
-              id: `item_ai_${Date.now()}_${idx}`,
-              item_name: it.item_name || 'Barang',
-              quantity: Number(it.quantity) || 1,
-              unit: it.unit || 'pcs',
-              unit_price: Number(it.unit_price) || 0,
-              subtotal: Number(it.subtotal) || ((Number(it.quantity) || 1) * (Number(it.unit_price) || 0)),
-            })));
+      if (res.ok && json.data) {
+        const aiData = json.data;
+        let filledCount = 0;
 
-            try {
-              confetti({
-                particleCount: 50,
-                spread: 45,
-                origin: { y: 0.7 }
-              });
-            } catch {}
-          }
+        if (aiData.supplier_name && aiData.supplier_name !== 'Toko/Supplier') {
+          setSupplierName(aiData.supplier_name);
+          filledCount++;
         }
+        if (aiData.purchase_date) {
+          setPurchaseDate(aiData.purchase_date);
+          filledCount++;
+        }
+        if (aiData.notes) {
+          setNotes(aiData.notes);
+        }
+        if (Array.isArray(aiData.items) && aiData.items.length > 0) {
+          setItems(aiData.items.map((it: any, idx: number) => ({
+            id: `item_ai_${Date.now()}_${idx}`,
+            item_name: it.item_name || 'Barang',
+            quantity: Number(it.quantity) || 1,
+            unit: it.unit || 'pcs',
+            unit_price: Number(it.unit_price) || 0,
+            subtotal: Number(it.subtotal) || ((Number(it.quantity) || 1) * (Number(it.unit_price) || 0)),
+          })));
+          filledCount += aiData.items.length;
+        }
+
+        if (filledCount > 0) {
+          setAiScanStatus(`✓ AI Berhasil membaca ${aiData.items?.length || 0} item & mengisi form otomatis!`);
+          try {
+            confetti({
+              particleCount: 60,
+              spread: 50,
+              origin: { y: 0.7 }
+            });
+          } catch {}
+        } else {
+          setAiScanStatus('⚠️ Gambar terupload, namun AI tidak menemukan teks rincian belanjaan. Anda bisa isi form manual.');
+        }
+      } else {
+        setAiScanStatus('⚠️ Gambar terupload. AI tidak mendeteksi teks struk/nota.');
       }
     } catch (err) {
       console.error('Gagal scan nota AI:', err);
+      setAiScanStatus('⚠️ Gagal terhubung ke AI Scanner. Foto tetap tersimpan, silakan isi rincian manual.');
     } finally {
       setIsScanningAI(false);
     }
@@ -257,7 +272,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
               </span>
             </h2>
             <p className="text-[11px] font-bold text-black/70">
-              Foto nota struk &rarr; AI otomatis membaca rincian barang, harga, & toko
+              Foto nota struk &rarr; AI otomatis mengisi nama toko, barang, qty, dan harga
             </p>
           </div>
           <button
@@ -280,7 +295,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
               {isScanningAI && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase bg-[#FFE600] border border-black px-2 py-0.5 animate-pulse">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Membaca Nota...
+                  Menganalisis Struk...
                 </span>
               )}
             </div>
@@ -288,7 +303,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             <div className="flex flex-col sm:flex-row items-center gap-2">
               <label className="w-full sm:w-auto flex-1 cursor-pointer flex items-center justify-center gap-2 p-3 bg-white border-3 border-black shadow-[2px_2px_0px_#121212] hover:bg-slate-50 text-xs font-black uppercase">
                 <Camera className="h-4 w-4 stroke-[2.5]" />
-                <span>{isScanningAI ? 'AI Sedang Membaca Struk...' : isUploading ? 'Mengunggah...' : '📸 Foto Nota (Auto Isi Form)'}</span>
+                <span>{isScanningAI ? 'AI Sedang Membaca Struk...' : isUploading ? 'Mengunggah...' : '📸 Foto Nota / Upload Struk'}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -307,11 +322,14 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                     className="h-9 w-9 object-cover border border-black"
                   />
                   <span className="text-xs font-black text-black pr-2 uppercase">
-                    ✓ Nota Terbaca
+                    ✓ Gambar Tersimpan
                   </span>
                   <button
                     type="button"
-                    onClick={() => setReceiptImage(null)}
+                    onClick={() => {
+                      setReceiptImage(null);
+                      setAiScanStatus(null);
+                    }}
                     className="p-1 border border-black bg-[#FF4343] text-white"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -319,9 +337,15 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                 </div>
               )}
             </div>
-            <p className="text-[10px] font-bold text-black/70">
-              *Foto nota struk belanjaan Anda &rarr; Nama toko, item barang, qty, dan harga satuan akan terisi otomatis.
-            </p>
+
+            {/* AI Status Message */}
+            {aiScanStatus && (
+              <div className={`p-2 border-2 border-black text-xs font-bold ${
+                aiScanStatus.startsWith('✓') ? 'bg-[#00F0FF] text-black' : 'bg-[#FFE600] text-black'
+              }`}>
+                {aiScanStatus}
+              </div>
+            )}
           </div>
 
           {/* Outlet & Tanggal */}
