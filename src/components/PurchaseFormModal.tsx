@@ -10,7 +10,8 @@ import {
   Trash2,
   AlertCircle,
   Calculator,
-  ArrowRight
+  ArrowRight,
+  Camera
 } from 'lucide-react';
 
 interface PurchaseFormModalProps {
@@ -39,6 +40,15 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
   const [notes, setNotes] = useState<string>('');
+  const [receiptImage, setReceiptImage] = useState<string | null>(null);
+
+  const handleReceiptImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setReceiptImage(reader.result as string);
+    reader.readAsDataURL(file);
+  };
 
   const [items, setItems] = useState<PurchaseItem[]>([
     { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
@@ -55,6 +65,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       setIsTempo(initialData.is_tempo);
       setTempoDueDate(initialData.tempo_due_date || '');
       setNotes(initialData.notes || '');
+      setReceiptImage(initialData.receipt_image_url || null);
       setItems(initialData.items && initialData.items.length > 0 ? initialData.items : [
         { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
       ]);
@@ -67,6 +78,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       setAdvanceBatchId('auto_fifo');
       setIsTempo(false);
       setNotes('');
+      setReceiptImage(null);
     }
   }, [initialData, isOpen, selectedOutletId, outlets]);
 
@@ -131,6 +143,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       tempo_due_date: isTempo ? tempoDueDate : undefined,
       tempo_status: isTempo ? (initialData?.tempo_status || 'unpaid') : undefined,
       notes: notes.trim() || undefined,
+      receipt_image_url: receiptImage || undefined,
       items: validItems,
     };
 
@@ -531,6 +544,36 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                 {formatRupiah(totalCalculated)}
               </span>
             </div>
+          </div>
+
+          {/* Upload Foto Nota */}
+          <div>
+            <label className="block text-xs font-black text-black uppercase mb-1">
+              Foto Nota / Struk (Opsional)
+            </label>
+            <label className="w-full cursor-pointer flex items-center justify-center gap-2 p-3 bg-white border-3 border-black shadow-[3px_3px_0px_#121212] hover:bg-slate-50 text-xs font-black uppercase">
+              <Camera className="h-4 w-4 stroke-[2.5]" />
+              <span>{receiptImage ? '✓ Nota Sudah Terlampir — Ganti Foto' : 'Upload Foto Nota / Struk'}</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleReceiptImageChange}
+                className="hidden"
+              />
+            </label>
+            {receiptImage && (
+              <div className="flex items-center gap-2 mt-2 bg-white p-2 border-2 border-black">
+                <img src={receiptImage} alt="Nota" className="h-10 w-10 object-cover border border-black" />
+                <span className="text-xs font-black text-black">✓ NOTA TERLAMPIR</span>
+                <button
+                  type="button"
+                  onClick={() => setReceiptImage(null)}
+                  className="ml-auto text-[10px] font-bold text-red-600 hover:text-red-800"
+                >
+                  Hapus
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Catatan Tambahan */}
