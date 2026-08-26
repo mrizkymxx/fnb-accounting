@@ -14,7 +14,8 @@ import {
   Receipt,
   PlusCircle,
   CreditCard,
-  Plus
+  Plus,
+  Calculator
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -25,6 +26,7 @@ interface DashboardViewProps {
   onViewReceipt: (url: string, title: string) => void;
   onGoToTempo: () => void;
   onGoToAdvance: () => void;
+  onOpenSettlement: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -35,6 +37,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onViewReceipt,
   onGoToTempo,
   onGoToAdvance,
+  onOpenSettlement,
 }) => {
   const {
     outlets,
@@ -77,13 +80,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Action Buttons Toolbar (Professional Grid for Mobile & Desktop) */}
-        <div className="grid grid-cols-3 gap-2 pt-1 border-t-2 border-black/10">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t-2 border-black/10">
           <button
             onClick={onOpenNewAdvance}
             className="py-2.5 px-2 bg-[#00F0FF] border-2 border-black text-black text-[11px] sm:text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex items-center justify-center gap-1"
           >
             <CreditCard className="h-3.5 w-3.5 stroke-[2.5]" />
             <span className="truncate">+ Dana Masuk</span>
+          </button>
+
+          <button
+            onClick={onOpenNewPurchase}
+            className="py-2.5 px-2 bg-[#FF4343] text-white border-2 border-black text-[11px] sm:text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex items-center justify-center gap-1"
+          >
+            <PlusCircle className="h-3.5 w-3.5 stroke-[2.5]" />
+            <span className="truncate">+ Belanja</span>
           </button>
 
           <button
@@ -95,11 +106,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
 
           <button
-            onClick={onOpenNewPurchase}
-            className="py-2.5 px-2 bg-[#FF4343] text-white border-2 border-black text-[11px] sm:text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex items-center justify-center gap-1"
+            onClick={onOpenSettlement}
+            className="py-2.5 px-2 bg-white border-2 border-black text-black text-[11px] sm:text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex items-center justify-center gap-1"
           >
-            <PlusCircle className="h-3.5 w-3.5 stroke-[2.5]" />
-            <span className="truncate">+ Belanja</span>
+            <Calculator className="h-3.5 w-3.5 stroke-[2.5]" />
+            <span className="truncate">Rekap Kasir</span>
           </button>
         </div>
       </div>
