@@ -405,6 +405,37 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                     </div>
                   </div>
                 )}
+
+                {paymentSource === 'transfer_bank' && (
+                  <div className="p-3 bg-[#FFE600]/30 border-2 border-black space-y-2">
+                    <label className="block text-[11px] font-black text-black uppercase">
+                      Bukti Transfer Bank
+                    </label>
+                    <label className="w-full cursor-pointer flex items-center justify-center gap-2 p-2.5 bg-white border-2 border-dashed border-black hover:bg-slate-50 text-xs font-black uppercase">
+                      <Camera className="h-4 w-4 stroke-[2.5]" />
+                      <span>{receiptImage ? '✓ Bukti Transfer Terlampir' : 'Upload Bukti Transfer'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleReceiptImageChange}
+                        className="hidden"
+                      />
+                    </label>
+                    {receiptImage && (
+                      <div className="flex items-center gap-2 bg-white p-1.5 border border-black">
+                        <img src={receiptImage} alt="Bukti" className="h-8 w-8 object-cover border border-black" />
+                        <span className="text-[10px] font-black text-black">✓ BUKTI TRANSFER</span>
+                        <button
+                          type="button"
+                          onClick={() => setReceiptImage(null)}
+                          className="ml-auto text-[10px] font-bold text-red-600"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="p-3 bg-[#FFE600] border-2 border-black space-y-2">
