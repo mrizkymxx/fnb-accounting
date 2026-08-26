@@ -1,5 +1,15 @@
-import { Purchase, CashCollection, AdvanceFundBatch, Supplier, Outlet } from '@/types/database';
-import { formatDateIndo } from './formatters';
+import { Purchase, CashCollection, AdvanceFundBatch, Outlet, Supplier } from '@/types/database';
+
+export interface AuditLogEntry {
+  date: string;
+  time: string;
+  type: 'BELANJA' | 'TARIK_KAS' | 'DANA_MASUK' | 'BAYAR_TEMPO' | 'SETOR_BANK';
+  outlet_name: string;
+  title: string;
+  amount: number;
+  details: string;
+  has_receipt: boolean;
+}
 
 function downloadCSV(filename: string, content: string) {
   const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' });
@@ -10,6 +20,109 @@ function downloadCSV(filename: string, content: string) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+// Generate unified audit timeline and export by date range
+export function generateAuditReport(
+  startDate: string,
+  endDate: string,
+  outletId: string,
+  purchases: Purchase[],
+  collections: CashCollection[],
+  advanceBatches: AdvanceFundBatch[],
+  outlets: Outlet[]
+) {
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  const logs: AuditLogEntry[] = [];
+
+  // 1. Filter Purchases in range
+  purchases.forEach(p => {
+    if (outletId !== 'all' && p.outlet_id !== outletId) return;
+    const pDate = new Date(p.purchase_date);
+    if (pDate >= start && pDate <= end) {
+      const outlet = outlets.find(o => o.id === p.outlet_id);
+      logs.push({
+        date: p.purchase_date,
+        time: p.created_at ? p.created_at.split('T')[1]?.substring(0, 5) : '00:00',
+        type: p.is_tempo ? 'BAYAR_TEMPO' : 'BELANJA',
+        outlet_name: outlet?.name || p.outlet_id,
+        title: `Belanja ${p.supplier_name}`,
+        amount: p.total_amount,
+        details: `${p.items?.length || 0} item barang (${p.payment_source.replace('_', ' ')})`,
+        has_receipt: Boolean(p.receipt_image_url),
+      });
+    }
+  });
+
+  // 2. Filter Collections in range
+  collections.forEach(c => {
+    if (outletId !== 'all' && c.outlet_id !== outletId) return;
+    const cDate = new Date(c.collected_at);
+    if (cDate >= start && cDate <= end) {
+      const outlet = outlets.find(o => o.id === c.outlet_id);
+      logs.push({
+        date: c.collected_at.split('T')[0],
+        time: c.collected_at.split('T')[1]?.substring(0, 5) || '00:00',
+        type: 'TARIK_KAS',
+        outlet_name: outlet?.name || c.outlet_id,
+        title: `Tarik Kasir ${c.source}`,
+        amount: c.amount,
+        details: c.status === 'deposited_to_bank' ? `Sudah disetor ke ${c.deposit_bank}` : 'Uang masih dipegang (Held)',
+        has_receipt: Boolean(c.proof_image_url),
+      });
+    }
+  });
+
+  // 3. Filter Advance Funds in range
+  advanceBatches.forEach(b => {
+    if (outletId !== 'all' && b.outlet_id !== outletId) return;
+    const bDate = new Date(b.received_at);
+    if (bDate >= start && bDate <= end) {
+      const outlet = outlets.find(o => o.id === b.outlet_id);
+      logs.push({
+        date: b.received_at.split('T')[0],
+        time: b.received_at.split('T')[1]?.substring(0, 5) || '00:00',
+        type: 'DANA_MASUK',
+        outlet_name: outlet?.name || b.outlet_id,
+        title: `Terima Transfer Luar: ${b.batch_name}`,
+        amount: b.initial_amount,
+        details: `Pengirim: ${b.sender_source} (Sisa saat ini: Rp${b.remaining_amount.toLocaleString('id-ID')})`,
+        has_receipt: Boolean(b.proof_image_url),
+      });
+    }
+  });
+
+  // Sort logs by date descending
+  logs.sort((a, b) => new Date(`${b.date}T${b.time}`).getTime() - new Date(`${a.date}T${a.time}`).getTime());
+
+  return logs;
+}
+
+// Export Complete Audit Log CSV
+export function exportPeriodAuditCSV(
+  startDate: string,
+  endDate: string,
+  logs: AuditLogEntry[],
+  outletName: string
+) {
+  const headers = ['Tanggal', 'Jam', 'Tipe Aktivitas', 'Outlet', 'Nama Aktivitas / Toko', 'Nominal (Rp)', 'Keterangan / Detail', 'Ada Bukti Foto / Nota'];
+  const rows = logs.map(l => [
+    l.date,
+    l.time,
+    l.type,
+    `"${l.outlet_name.replace(/"/g, '""')}"`,
+    `"${l.title.replace(/"/g, '""')}"`,
+    l.amount,
+    `"${l.details.replace(/"/g, '""')}"`,
+    l.has_receipt ? 'Ya (Foto Ada)' : 'Tidak',
+  ]);
+
+  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+  downloadCSV(`Laporan_Audit_FnB_${outletName}_${startDate}_sd_${endDate}.csv`, csvContent);
 }
 
 // 1. Export Purchases CSV

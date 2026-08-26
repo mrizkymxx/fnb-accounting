@@ -2,11 +2,11 @@
 
 import React from 'react';
 import { useApp } from '@/context/AppContext';
-import { Store, Wallet, AlertCircle, ShoppingBag, PlusCircle, Building2, CreditCard } from 'lucide-react';
+import { Store, Wallet, AlertCircle, ShoppingBag, PlusCircle, Building2, CreditCard, FileText } from 'lucide-react';
 
 interface NavbarProps {
-  activeTab: 'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers';
-  setActiveTab: (tab: 'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers') => void;
+  activeTab: 'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers' | 'audit_reports';
+  setActiveTab: (tab: 'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers' | 'audit_reports') => void;
   onOpenNewPurchase: () => void;
   onOpenCollectCash: () => void;
   onOpenNewAdvance: () => void;
@@ -32,7 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      {/* Top Header - Clean, Integrated, Native iOS Vibe */}
+      {/* Top Header */}
       <header className="sticky top-0 z-40 bg-[#FFE600] border-b-3 border-black text-black shadow-[0_3px_0px_#121212] pt-[env(safe-area-inset-top,0px)]">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14 sm:h-16">
@@ -51,9 +51,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
 
-            {/* Top Right Quick Actions (Integrated & Clean) */}
+            {/* Quick Actions Header */}
             <div className="flex items-center gap-1.5 sm:gap-2">
-              {/* Outlet Selector */}
               <select
                 value={selectedOutletId}
                 onChange={(e) => setSelectedOutletId(e.target.value)}
@@ -65,7 +64,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ))}
               </select>
 
-              {/* Main Primary Action */}
               <button
                 onClick={onOpenNewPurchase}
                 className="flex items-center gap-1 bg-[#FF4343] text-white border-2 border-black px-2.5 sm:px-3.5 py-1.5 text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all"
@@ -138,6 +136,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
             <button
+              onClick={() => setActiveTab('audit_reports')}
+              className={`px-3 py-1.5 border-2 border-black transition-all flex items-center gap-1 ${
+                activeTab === 'audit_reports' ? 'bg-black text-white shadow-[2px_2px_0px_#121212]' : 'bg-white text-black hover:bg-slate-100'
+              }`}
+            >
+              <FileText className="h-3.5 w-3.5 stroke-[2.5]" />
+              <span>Ekstrak Audit Laporan</span>
+            </button>
+            <button
               onClick={() => setActiveTab('suppliers')}
               className={`px-3 py-1.5 border-2 border-black transition-all flex items-center gap-1 ${
                 activeTab === 'suppliers' ? 'bg-black text-white shadow-[2px_2px_0px_#121212]' : 'bg-white text-black hover:bg-slate-100'
@@ -150,9 +157,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </header>
 
-      {/* Mobile Bottom Navigation Bar (Apple HIG Tab Bar) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#FFE600] border-t-3 border-black shadow-[0_-3px_0px_#121212] px-1.5 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        <div className="grid grid-cols-5 gap-1 text-[9px] font-black uppercase text-center">
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#FFE600] border-t-3 border-black shadow-[0_-3px_0px_#121212] px-1 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <div className="grid grid-cols-6 gap-0.5 text-[8.5px] font-black uppercase text-center">
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`py-1.5 px-0.5 border-2 border-black flex flex-col items-center justify-center transition-all ${
@@ -181,9 +188,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <CreditCard className="h-3.5 w-3.5 stroke-[2.5]" />
             <span className="truncate w-full">Rekening</span>
-            {totalAdvanceRemainingAll > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-[#00F0FF] border border-black rounded-full" />
-            )}
           </button>
 
           <button
@@ -194,9 +198,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Wallet className="h-3.5 w-3.5 stroke-[2.5]" />
             <span className="truncate w-full">Kasir</span>
-            {readyToDepositCount > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-[#FF4343] border border-black rounded-full animate-ping" />
-            )}
           </button>
 
           <button
@@ -207,9 +208,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <AlertCircle className="h-3.5 w-3.5 stroke-[2.5]" />
             <span className="truncate w-full">Tempo</span>
-            {unpaidTempoCount > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-[#FF4343] border border-black rounded-full" />
-            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('audit_reports')}
+            className={`py-1.5 px-0.5 border-2 border-black flex flex-col items-center justify-center relative transition-all ${
+              activeTab === 'audit_reports' ? 'bg-black text-white shadow-[1px_1px_0px_#121212]' : 'bg-white text-black'
+            }`}
+          >
+            <FileText className="h-3.5 w-3.5 stroke-[2.5]" />
+            <span className="truncate w-full">Audit</span>
           </button>
         </div>
       </nav>

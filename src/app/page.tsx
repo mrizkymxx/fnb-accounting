@@ -10,6 +10,7 @@ import { AdvanceFundView } from '@/components/AdvanceFundView';
 import { CashTrackerView } from '@/components/CashTrackerView';
 import { TempoManagerView } from '@/components/TempoManagerView';
 import { SuppliersView } from '@/components/SuppliersView';
+import { AuditReportView } from '@/components/AuditReportView';
 import { PurchaseFormModal } from '@/components/PurchaseFormModal';
 import { AdvanceFundModal } from '@/components/AdvanceFundModal';
 import { CashCollectionModal } from '@/components/CashCollectionModal';
@@ -19,15 +20,13 @@ import { LoginScreen } from '@/components/LoginScreen';
 
 function MainApp() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers' | 'audit_reports'>('dashboard');
 
-  // Check auth session
   useEffect(() => {
     const session = localStorage.getItem('fnb_auth_session');
     setIsAuthenticated(session === 'authenticated');
   }, []);
 
-  // Modals state
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
 
@@ -88,7 +87,7 @@ function MainApp() {
 
   return (
     <div className="min-h-screen text-black flex flex-col antialiased selection:bg-[#FFE600] selection:text-black font-sans">
-      {/* Top Navbar with Logout option */}
+      {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -99,7 +98,6 @@ function MainApp() {
 
       {/* Main View Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
-        {/* Quick Logout Bar on Desktop */}
         <div className="hidden sm:flex justify-end mb-2">
           <button
             onClick={handleLogout}
@@ -148,6 +146,10 @@ function MainApp() {
 
         {activeTab === 'tempo' && (
           <TempoManagerView onViewReceipt={handleViewReceipt} />
+        )}
+
+        {activeTab === 'audit_reports' && (
+          <AuditReportView />
         )}
 
         {activeTab === 'suppliers' && (
