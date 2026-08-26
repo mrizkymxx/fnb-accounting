@@ -158,7 +158,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-xs overflow-y-auto overflow-x-hidden">
-      <div className="bg-[#FFFDF5] border-t-4 sm:border-4 border-black w-full max-w-3xl shadow-[8px_8px_0px_#121212] overflow-hidden rounded-t-2xl sm:rounded-none max-h-[94dvh] flex flex-col">
+      <div className="bg-[#FFFDF5] border-t-4 sm:border-4 border-black w-full max-w-3xl shadow-[8px_8px_0px_#121212] overflow-hidden rounded-t-2xl sm:rounded-none max-h-[94dvh] flex flex-col min-w-0">
         {/* Modal Header */}
         <div className="flex items-center justify-between p-3.5 sm:p-4 border-b-4 border-black bg-[#FFE600] shrink-0">
           <div>
@@ -179,7 +179,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="p-3.5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} className="p-3.5 sm:p-6 space-y-4 overflow-y-auto overflow-x-hidden flex-1">
           {/* FORM PENGATURAN TARGET & PEMBAYARAN */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -192,7 +192,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                   setOutletId(e.target.value);
                   setAdvanceBatchId('auto_fifo');
                 }}
-                className="w-full bg-white border-3 border-black p-2 text-xs sm:text-sm font-black text-black shadow-[3px_3px_0px_#121212] focus:outline-none"
+                className="w-full bg-white border-3 border-black p-2 text-xs sm:text-sm font-black text-black sm:shadow-[3px_3px_0px_#121212] focus:outline-none"
                 required
               >
                 {outlets.map((o) => (
@@ -211,7 +211,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                 type="date"
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full bg-white border-3 border-black p-2 text-xs sm:text-sm font-bold text-black shadow-[3px_3px_0px_#121212] focus:outline-none"
+                className="w-full bg-white border-3 border-black p-2 text-xs sm:text-sm font-bold text-black sm:shadow-[3px_3px_0px_#121212] focus:outline-none"
                 required
               />
             </div>
@@ -531,7 +531,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
               {items.map((item, index) => (
                 <div
                   key={item.id || index}
-                  className="grid grid-cols-12 gap-1.5 sm:gap-2 bg-white p-2 border-3 border-black shadow-[2px_2px_0px_#121212] items-center"
+                  className="grid grid-cols-12 gap-1 sm:gap-2 bg-white p-1.5 sm:p-2 border-2 sm:border-3 border-black sm:shadow-[2px_2px_0px_#121212] items-center min-w-0"
                 >
                   <div className="col-span-12 sm:col-span-5">
                     <input
