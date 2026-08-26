@@ -50,6 +50,7 @@ interface AppContextType {
   unpaidTempoCount: number;
   unpaidTempoTotal: number;
   todayExpenseTotal: number;
+  isCloudSyncActive: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -70,30 +71,62 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [advanceBatches, setAdvanceBatches] = useState<AdvanceFundBatch[]>([]);
   const [selectedOutletId, setSelectedOutletId] = useState<string | 'all'>('all');
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isCloudSyncActive, setIsCloudSyncActive] = useState(false);
 
-  // Initial Load
+  // Initial Load from Supabase Cloud First, Fallback to LocalStorage
   useEffect(() => {
-    try {
-      const storedOutlets = localStorage.getItem(STORAGE_KEYS.OUTLETS);
-      const storedSuppliers = localStorage.getItem(STORAGE_KEYS.SUPPLIERS);
-      const storedPurchases = localStorage.getItem(STORAGE_KEYS.PURCHASES);
-      const storedCollections = localStorage.getItem(STORAGE_KEYS.COLLECTIONS);
-      const storedBatches = localStorage.getItem(STORAGE_KEYS.ADVANCE_BATCHES);
+    async function loadData() {
+      // 1. Coba load dari Supabase jika terkonfigurasi
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const [outletsRes, suppliersRes, batchesRes, purchasesRes, collectionsRes] = await Promise.all([
+            supabase.from('outlets').select('*'),
+            supabase.from('suppliers').select('*'),
+            supabase.from('advance_fund_batches').select('*'),
+            supabase.from('purchases').select('*, items:purchase_items(*)').order('purchase_date', { ascending: false }),
+            supabase.from('cash_collections').select('*').order('collected_at', { ascending: false }),
+          ]);
 
-      setOutlets(storedOutlets ? JSON.parse(storedOutlets) : INITIAL_OUTLETS);
-      setSuppliers(storedSuppliers ? JSON.parse(storedSuppliers) : INITIAL_SUPPLIERS);
-      setPurchases(storedPurchases ? JSON.parse(storedPurchases) : INITIAL_PURCHASES);
-      setCollections(storedCollections ? JSON.parse(storedCollections) : INITIAL_COLLECTIONS);
-      setAdvanceBatches(storedBatches ? JSON.parse(storedBatches) : INITIAL_ADVANCE_BATCHES);
-    } catch {
-      setOutlets(INITIAL_OUTLETS);
-      setSuppliers(INITIAL_SUPPLIERS);
-      setPurchases(INITIAL_PURCHASES);
-      setCollections(INITIAL_COLLECTIONS);
-      setAdvanceBatches(INITIAL_ADVANCE_BATCHES);
-    } finally {
-      setIsLoaded(true);
+          if (outletsRes.data && outletsRes.data.length > 0) {
+            setOutlets(outletsRes.data as Outlet[]);
+            setSuppliers((suppliersRes.data as Supplier[]) || []);
+            setAdvanceBatches((batchesRes.data as AdvanceFundBatch[]) || []);
+            setPurchases((purchasesRes.data as Purchase[]) || []);
+            setCollections((collectionsRes.data as CashCollection[]) || []);
+            setIsCloudSyncActive(true);
+            setIsLoaded(true);
+            return;
+          }
+        } catch (err) {
+          console.warn('Cloud sync offline or error, falling back to LocalStorage', err);
+        }
+      }
+
+      // 2. Fallback ke LocalStorage jika Supabase kosong / offline
+      try {
+        const storedOutlets = localStorage.getItem(STORAGE_KEYS.OUTLETS);
+        const storedSuppliers = localStorage.getItem(STORAGE_KEYS.SUPPLIERS);
+        const storedPurchases = localStorage.getItem(STORAGE_KEYS.PURCHASES);
+        const storedCollections = localStorage.getItem(STORAGE_KEYS.COLLECTIONS);
+        const storedBatches = localStorage.getItem(STORAGE_KEYS.ADVANCE_BATCHES);
+
+        setOutlets(storedOutlets ? JSON.parse(storedOutlets) : INITIAL_OUTLETS);
+        setSuppliers(storedSuppliers ? JSON.parse(storedSuppliers) : INITIAL_SUPPLIERS);
+        setPurchases(storedPurchases ? JSON.parse(storedPurchases) : INITIAL_PURCHASES);
+        setCollections(storedCollections ? JSON.parse(storedCollections) : INITIAL_COLLECTIONS);
+        setAdvanceBatches(storedBatches ? JSON.parse(storedBatches) : INITIAL_ADVANCE_BATCHES);
+      } catch {
+        setOutlets(INITIAL_OUTLETS);
+        setSuppliers(INITIAL_SUPPLIERS);
+        setPurchases(INITIAL_PURCHASES);
+        setCollections(INITIAL_COLLECTIONS);
+        setAdvanceBatches(INITIAL_ADVANCE_BATCHES);
+      } finally {
+        setIsLoaded(true);
+      }
     }
+
+    loadData();
   }, []);
 
   // Save to LocalStorage
@@ -121,16 +154,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       created_at: new Date().toISOString(),
     };
     setOutlets(prev => [...prev, newOutlet]);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('outlets').insert({
+        id: newOutlet.id,
+        name: newOutlet.name,
+        type: newOutlet.type,
+        cash_deposit_threshold: newOutlet.cash_deposit_threshold,
+        status: newOutlet.status,
+      }).then();
+    }
+
     return newOutlet;
   };
 
   const updateOutlet = async (id: string, data: Partial<Outlet>) => {
     setOutlets(prev => prev.map(o => o.id === id ? { ...o, ...data } : o));
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('outlets').update(data).eq('id', id).then();
+    }
   };
 
   const deleteOutlet = async (id: string) => {
     setOutlets(prev => prev.filter(o => o.id !== id));
     if (selectedOutletId === id) setSelectedOutletId('all');
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('outlets').delete().eq('id', id).then();
+    }
   };
 
   // ==========================================
@@ -148,11 +200,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       created_at: new Date().toISOString(),
     };
     setAdvanceBatches(prev => [newBatch, ...prev]);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('advance_fund_batches').insert(newBatch).then();
+    }
+
     return newBatch;
   };
 
   const updateAdvanceFundBatch = async (id: string, data: Partial<AdvanceFundBatch>) => {
     setAdvanceBatches(prev => prev.map(b => b.id === id ? { ...b, ...data } : b));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('advance_fund_batches').update(data).eq('id', id).then();
+    }
   };
 
   const deleteAdvanceFundBatch = async (batchId: string) => {
@@ -163,6 +223,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return p;
     }));
     setAdvanceBatches(prev => prev.filter(b => b.id !== batchId));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('advance_fund_batches').delete().eq('id', batchId).then();
+    }
   };
 
   const closeAdvanceFundBatch = async (batchId: string) => {
@@ -172,6 +235,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return b;
     }));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('advance_fund_batches').update({ status: 'closed' }).eq('id', batchId).then();
+    }
   };
 
   const consolidateAdvanceBatches = async (
@@ -207,6 +273,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     setAdvanceBatches(prev => [newConsolidatedBatch, ...prev]);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('advance_fund_batches').insert(newConsolidatedBatch).then();
+      batchIds.forEach(id => {
+        supabase.from('advance_fund_batches').update({ status: 'closed' }).eq('id', id).then();
+      });
+    }
+
     return newConsolidatedBatch;
   };
 
@@ -256,6 +330,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('purchases').insert({
+        id: newPurchase.id,
+        outlet_id: newPurchase.outlet_id,
+        supplier_id: newPurchase.supplier_id,
+        supplier_name: newPurchase.supplier_name,
+        purchase_date: newPurchase.purchase_date,
+        payment_source: newPurchase.payment_source,
+        advance_batch_id: newPurchase.advance_batch_id !== 'auto_fifo' ? newPurchase.advance_batch_id : null,
+        total_amount: newPurchase.total_amount,
+        is_tempo: newPurchase.is_tempo,
+        tempo_due_date: newPurchase.tempo_due_date,
+        tempo_status: newPurchase.tempo_status,
+        receipt_image_url: newPurchase.receipt_image_url,
+        notes: newPurchase.notes,
+      }).then(() => {
+        if (newPurchase.items && newPurchase.items.length > 0) {
+          const itemsToInsert = newPurchase.items.map(it => ({
+            purchase_id: newPurchase.id,
+            item_name: it.item_name,
+            quantity: it.quantity,
+            unit: it.unit,
+            unit_price: it.unit_price,
+            subtotal: it.subtotal,
+          }));
+          supabase.from('purchase_items').insert(itemsToInsert).then();
+        }
+      });
+    }
+
     return newPurchase;
   };
 
@@ -285,6 +389,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     setPurchases(prev => prev.map(p => p.id === id ? newPurchase : p));
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('purchases').update({
+        outlet_id: newPurchase.outlet_id,
+        supplier_id: newPurchase.supplier_id,
+        supplier_name: newPurchase.supplier_name,
+        purchase_date: newPurchase.purchase_date,
+        payment_source: newPurchase.payment_source,
+        total_amount: newPurchase.total_amount,
+        is_tempo: newPurchase.is_tempo,
+        tempo_due_date: newPurchase.tempo_due_date,
+        tempo_status: newPurchase.tempo_status,
+        receipt_image_url: newPurchase.receipt_image_url,
+        notes: newPurchase.notes,
+      }).eq('id', id).then();
+    }
   };
 
   const deletePurchase = async (id: string) => {
@@ -304,6 +424,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     setPurchases(prev => prev.filter(p => p.id !== id));
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('purchases').delete().eq('id', id).then();
+    }
   };
 
   const updateTempoStatus = async (id: string, status: 'paid' | 'unpaid', proofUrl?: string) => {
@@ -318,6 +442,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return p;
     }));
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('purchases').update({
+        tempo_status: status,
+        tempo_paid_at: status === 'paid' ? new Date().toISOString() : null,
+        tempo_payment_proof_url: proofUrl || null,
+      }).eq('id', id).then();
+    }
   };
 
   // ==========================================
@@ -331,15 +463,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       created_at: new Date().toISOString(),
     };
     setCollections(prev => [newCol, ...prev]);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('cash_collections').insert(newCol).then();
+    }
+
     return newCol;
   };
 
   const updateCashCollection = async (id: string, data: Partial<CashCollection>) => {
     setCollections(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('cash_collections').update(data).eq('id', id).then();
+    }
   };
 
   const deleteCashCollection = async (id: string) => {
     setCollections(prev => prev.filter(c => c.id !== id));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('cash_collections').delete().eq('id', id).then();
+    }
   };
 
   const depositCashOnHand = async (outletId: string, bankName: string, bankAccount: string, slipUrl?: string, notes?: string) => {
@@ -358,6 +501,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return c;
     }));
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('cash_collections').update({
+        status: 'deposited_to_bank',
+        deposited_at: nowIso,
+        deposit_bank: bankName,
+        deposit_account: bankAccount,
+        proof_image_url: slipUrl || null,
+      }).eq('outlet_id', outletId).eq('status', 'held_by_me').then();
+    }
   };
 
   // ==========================================
@@ -371,15 +524,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       created_at: new Date().toISOString(),
     };
     setSuppliers(prev => [...prev, newSup]);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('suppliers').insert(newSup).then();
+    }
+
     return newSup;
   };
 
   const updateSupplier = async (id: string, data: Partial<Supplier>) => {
     setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('suppliers').update(data).eq('id', id).then();
+    }
   };
 
   const deleteSupplier = async (id: string) => {
     setSuppliers(prev => prev.filter(s => s.id !== id));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('suppliers').delete().eq('id', id).then();
+    }
   };
 
   // Summaries
@@ -396,7 +560,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         outlet_name: outlet.name,
         threshold,
         total_held: totalHeld,
-        is_ready_to_deposit: totalHeld >= threshold,
+        is_ready_to_deposit: threshold > 0 && totalHeld >= threshold,
         collections: heldCollections,
       };
     });
@@ -461,6 +625,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         unpaidTempoCount,
         unpaidTempoTotal,
         todayExpenseTotal,
+        isCloudSyncActive,
       }}
     >
       {children}
