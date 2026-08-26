@@ -5,13 +5,18 @@ import { useApp } from '@/context/AppContext';
 import { Purchase, PurchaseItem, PaymentSource } from '@/types/database';
 import { formatRupiah } from '@/lib/formatters';
 import { uploadReceiptFile } from '@/lib/storageUtils';
+import { compressReceiptImage } from '@/lib/imageCompressor';
 import {
   X,
   Plus,
   Trash2,
   Camera,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  Loader2,
+  Wand2
 } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 interface PurchaseFormModalProps {
   isOpen: boolean;
@@ -40,6 +45,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isScanningAI, setIsScanningAI] = useState(false);
 
   const [items, setItems] = useState<PurchaseItem[]>([
     { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
@@ -133,19 +139,72 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
   const totalCalculated = items.reduce((acc, curr) => acc + (curr.subtotal || 0), 0);
 
-  // Kompresi + Upload ke Cloud Supabase Storage Bucket 'receipts'
+  // Kompresi + Upload ke Cloud Supabase Storage + AI Scan OCR otomatis
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
       setIsUploading(true);
-      const uploadedUrl = await uploadReceiptFile(file, 'purchases');
-      setReceiptImage(uploadedUrl);
+      setIsScanningAI(true);
+
+      // 1. Dapatkan base64 terkompresi
+      const compressedBase64 = await compressReceiptImage(file, 1200, 0.72);
+
+      // 2. Upload async ke Supabase Storage
+      uploadReceiptFile(file, 'purchases').then(url => {
+        setReceiptImage(url);
+        setIsUploading(false);
+      }).catch(() => {
+        setReceiptImage(compressedBase64);
+        setIsUploading(false);
+      });
+
+      // 3. Scan OCR AI Groq (Llama 3.2 Vision)
+      const res = await fetch('/api/ocr-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: compressedBase64 })
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          const aiData = json.data;
+
+          if (aiData.supplier_name && !supplierName) {
+            setSupplierName(aiData.supplier_name);
+          }
+          if (aiData.purchase_date) {
+            setPurchaseDate(aiData.purchase_date);
+          }
+          if (aiData.notes && !notes) {
+            setNotes(aiData.notes);
+          }
+          if (Array.isArray(aiData.items) && aiData.items.length > 0) {
+            setItems(aiData.items.map((it: any, idx: number) => ({
+              id: `item_ai_${Date.now()}_${idx}`,
+              item_name: it.item_name || 'Barang',
+              quantity: Number(it.quantity) || 1,
+              unit: it.unit || 'pcs',
+              unit_price: Number(it.unit_price) || 0,
+              subtotal: Number(it.subtotal) || ((Number(it.quantity) || 1) * (Number(it.unit_price) || 0)),
+            })));
+
+            try {
+              confetti({
+                particleCount: 50,
+                spread: 45,
+                origin: { y: 0.7 }
+              });
+            } catch {}
+          }
+        }
+      }
     } catch (err) {
-      console.error('Gagal upload nota:', err);
+      console.error('Gagal scan nota AI:', err);
     } finally {
-      setIsUploading(false);
+      setIsScanningAI(false);
     }
   };
 
@@ -191,11 +250,14 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center justify-between p-3.5 sm:p-4 border-b-4 border-black bg-[#FFE600] shrink-0">
           <div>
-            <h2 className="text-base sm:text-lg font-black text-black uppercase tracking-tight">
-              {initialData ? '✏️ Edit Transaksi Belanja & Nota' : '🧾 Catat Belanja & Nota Pembelian'}
+            <h2 className="text-base sm:text-lg font-black text-black uppercase tracking-tight flex items-center gap-1.5">
+              <span>{initialData ? '✏️ Edit Belanja' : '🧾 Catat Belanja & Scan Nota'}</span>
+              <span className="text-[10px] bg-[#00F0FF] text-black border border-black px-1.5 py-0.2 rounded font-black uppercase">
+                AI Groq
+              </span>
             </h2>
             <p className="text-[11px] font-bold text-black/70">
-              {initialData ? 'Perbarui rincian belanjaan & bukti nota' : 'Pisahkan nota per outlet walau belanja bersamaan di 1 toko'}
+              Foto nota struk &rarr; AI otomatis membaca rincian barang, harga, & toko
             </p>
           </div>
           <button
@@ -208,6 +270,60 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="p-3.5 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
+          {/* Upload Foto Nota & AI Auto Scan Bar */}
+          <div className="p-3.5 bg-[#00F0FF]/15 border-3 border-black shadow-[3px_3px_0px_#121212] space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-black uppercase flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-[#FF4343]" />
+                <span>Foto Nota Fisik & Auto-Scan AI (Groq Vision)</span>
+              </label>
+              {isScanningAI && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase bg-[#FFE600] border border-black px-2 py-0.5 animate-pulse">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Membaca Nota...
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <label className="w-full sm:w-auto flex-1 cursor-pointer flex items-center justify-center gap-2 p-3 bg-white border-3 border-black shadow-[2px_2px_0px_#121212] hover:bg-slate-50 text-xs font-black uppercase">
+                <Camera className="h-4 w-4 stroke-[2.5]" />
+                <span>{isScanningAI ? 'AI Sedang Membaca Struk...' : isUploading ? 'Mengunggah...' : '📸 Foto Nota (Auto Isi Form)'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleImageChange}
+                  disabled={isScanningAI || isUploading}
+                  className="hidden"
+                />
+              </label>
+
+              {receiptImage && (
+                <div className="flex items-center gap-2 bg-white p-1.5 border-2 border-black w-full sm:w-auto">
+                  <img
+                    src={receiptImage}
+                    alt="Preview"
+                    className="h-9 w-9 object-cover border border-black"
+                  />
+                  <span className="text-xs font-black text-black pr-2 uppercase">
+                    ✓ Nota Terbaca
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setReceiptImage(null)}
+                    className="p-1 border border-black bg-[#FF4343] text-white"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+            <p className="text-[10px] font-bold text-black/70">
+              *Foto nota struk belanjaan Anda &rarr; Nama toko, item barang, qty, dan harga satuan akan terisi otomatis.
+            </p>
+          </div>
+
           {/* Outlet & Tanggal */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -356,7 +472,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                   </button>
                 </div>
 
-                {/* Sub-selector batch */}
                 {paymentSource === 'advance_transfer' && (
                   <div className="p-3 bg-[#00F0FF]/15 border-2 border-black space-y-2">
                     <div className="flex items-center justify-between">
@@ -478,7 +593,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-black uppercase">
-                Daftar Barang Belanjaan
+                Daftar Barang Belanjaan (Hasil Scan / Manual)
               </label>
               <button
                 type="button"
@@ -571,47 +686,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             </div>
           </div>
 
-          {/* Upload Foto Nota */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-black text-black uppercase">
-              Foto Nota Fisik (Tersimpan di Cloud Supabase Storage)
-            </label>
-            <div className="flex flex-col sm:flex-row items-center gap-2">
-              <label className="w-full sm:w-auto flex-1 cursor-pointer flex items-center justify-center gap-2 p-2.5 sm:p-3 bg-white border-3 border-black shadow-[2px_2px_0px_#121212] text-xs font-black uppercase">
-                <Camera className="h-4 w-4 stroke-[2.5]" />
-                <span>{isUploading ? 'Mengunggah ke Cloud Storage...' : 'Foto / Unggah Struk'}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleImageChange}
-                  disabled={isUploading}
-                  className="hidden"
-                />
-              </label>
-
-              {receiptImage && (
-                <div className="flex items-center gap-2 bg-white p-1.5 border-2 border-black w-full sm:w-auto">
-                  <img
-                    src={receiptImage}
-                    alt="Preview"
-                    className="h-9 w-9 object-cover border border-black"
-                  />
-                  <span className="text-xs font-black text-black pr-2 uppercase">
-                    ✓ Cloud Tersimpan
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setReceiptImage(null)}
-                    className="p-1 border border-black bg-[#FF4343] text-white"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Catatan */}
           <div>
             <label className="block text-xs font-black text-black uppercase mb-1">
@@ -637,7 +711,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isUploading}
+              disabled={isUploading || isScanningAI}
               className="px-5 py-2 border-3 border-black bg-[#00F0FF] text-black text-xs font-black uppercase shadow-[3px_3px_0px_#121212] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all disabled:opacity-50"
             >
               {initialData ? 'Simpan Perubahan' : 'Simpan Belanja'}
