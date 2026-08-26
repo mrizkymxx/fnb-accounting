@@ -279,7 +279,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
             {!isTempo ? (
               <div className="space-y-2.5">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   <button
                     type="button"
                     onClick={() => setPaymentSource('advance_transfer')}
@@ -289,8 +289,21 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                         : 'bg-white'
                     }`}
                   >
-                    <div className="font-black text-[11px] uppercase">💰 Dana Titipan</div>
-                    <div className="text-[9px] font-bold text-black/70">Transfer luar</div>
+                    <div className="font-black text-[11px] uppercase">🏦 Titipan M-Banking</div>
+                    <div className="text-[9px] font-bold text-black/70">Potong saldo rekening</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPaymentSource('advance_cash')}
+                    className={`p-2.5 border-3 border-black text-left transition-all ${
+                      paymentSource === 'advance_cash'
+                        ? 'bg-[#00F0FF] shadow-[3px_3px_0px_#121212]'
+                        : 'bg-white'
+                    }`}
+                  >
+                    <div className="font-black text-[11px] uppercase">💵 Titipan Cash Dompet</div>
+                    <div className="text-[9px] font-bold text-black/70">Pakai uang tunai</div>
                   </button>
 
                   <button
@@ -303,7 +316,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                     }`}
                   >
                     <div className="font-black text-[11px] uppercase">Opening Cash</div>
-                    <div className="text-[9px] font-bold text-black/70">Modal kasir</div>
+                    <div className="text-[9px] font-bold text-black/70">Modal kasir toko</div>
                   </button>
 
                   <button
@@ -333,11 +346,11 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                   </button>
                 </div>
 
-                {paymentSource === 'advance_transfer' && (
+                {(paymentSource === 'advance_transfer' || paymentSource === 'advance_cash') && (
                   <div className="p-3 bg-[#00F0FF]/15 border-2 border-black space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-black text-black uppercase">
-                        Pilih Batch Dana Transfer Luar Yang Dipotong:
+                        {paymentSource === 'advance_cash' ? '💵 Potong Dari Batch Dana Titipan (Wujud Cash):' : '🏦 Potong Dari Batch Dana Titipan (Wujud M-Banking):'}
                       </label>
                       <span className="text-[10px] font-black bg-white border border-black px-1.5 py-0.2">
                         Total Kumpulan Sisa: {formatRupiah(totalOutletRemaining)}

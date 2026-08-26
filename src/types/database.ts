@@ -71,7 +71,7 @@ export interface PurchaseItem {
   subtotal: number;
 }
 
-export type PaymentSource = 'opening_cash' | 'personal_cash' | 'advance_transfer' | 'tempo' | 'transfer_bank';
+export type PaymentSource = 'opening_cash' | 'personal_cash' | 'advance_transfer' | 'advance_cash' | 'tempo' | 'transfer_bank';
 export type TempoStatus = 'unpaid' | 'paid' | 'overdue';
 
 export interface Purchase {
@@ -104,4 +104,13 @@ export interface CashOnHandSummary {
   total_held: number;
   is_ready_to_deposit: boolean;
   collections: CashCollection[];
+}
+
+export interface WalletBreakdown {
+  cashInWallet: number;        // Cash Fisik nyata di tangan (Kasir dipegang + Sisa Cash Titipan pecahan ATM)
+  balanceInBank: number;       // Saldo M-Banking nyata (Sisa transfer titipan di rekening)
+  totalRealMoney: number;      // Total uang yang ada di tangan/rekening pengguna
+  advanceCashHolding: number;  // Berapa dari total titipan yang wujudnya uang cash fisik di dompet
+  advanceBankBalance: number;  // Berapa dari total titipan yang wujudnya saldo rekening
+  cashierHeldTotal: number;    // Total kewajiban uang kasir yang belum disetor
 }

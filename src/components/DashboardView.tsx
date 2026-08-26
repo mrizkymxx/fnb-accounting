@@ -42,6 +42,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const {
     outlets,
     purchases,
+    walletBreakdown,
     cashOnHandSummaries,
     totalHeldAllOutlets,
     totalAdvanceRemainingAll,
@@ -112,6 +113,73 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <Calculator className="h-3.5 w-3.5 stroke-[2.5]" />
             <span className="truncate">Rekap Kasir</span>
           </button>
+        </div>
+      </div>
+
+      {/* DOMPET (CASH FISIK) & REKENING (M-BANKING) REAL-TIME FINANCIAL POSITION */}
+      <div className="bg-white border-3 sm:border-4 border-black p-3.5 sm:p-5 shadow-[4px_4px_0px_#121212] space-y-3">
+        <div className="flex items-center justify-between border-b-2 border-black pb-2">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 bg-[#FFE600] border-2 border-black font-black text-xs">
+              💼 POSISI UANG NYATA
+            </span>
+            <span className="text-xs sm:text-sm font-black uppercase text-black">
+              Dompet (Cash) vs Rekening (Bank)
+            </span>
+          </div>
+          <span className="text-[10px] sm:text-xs font-black bg-black text-white px-2 py-0.5 uppercase">
+            Total Riil: {formatRupiah(walletBreakdown.totalRealMoney)}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Card Dompet Cash Fisik */}
+          <div className="p-3 bg-[#FFE600]/25 border-3 border-black space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-black uppercase flex items-center gap-1.5">
+                <Wallet className="h-4 w-4 stroke-[2.5]" />
+                <span>💵 Cash Fisik di Dompet/Kantong</span>
+              </span>
+              <span className="text-base sm:text-lg font-black text-black">
+                {formatRupiah(walletBreakdown.cashInWallet)}
+              </span>
+            </div>
+
+            <div className="p-2 bg-white border-2 border-black space-y-1 text-[11px]">
+              <div className="flex items-center justify-between text-black/80 font-bold">
+                <span>&bull; Uang Kasir Dipegang (Belum Setor):</span>
+                <span className="font-black text-black">{formatRupiah(walletBreakdown.cashierHeldTotal)}</span>
+              </div>
+              <div className="flex items-center justify-between text-black/80 font-bold">
+                <span>&bull; Cash Sisa Pecahan ATM Titipan:</span>
+                <span className="font-black text-emerald-700">{formatRupiah(walletBreakdown.advanceCashHolding)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card Saldo M-Banking */}
+          <div className="p-3 bg-[#00F0FF]/25 border-3 border-black space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-black uppercase flex items-center gap-1.5">
+                <CreditCard className="h-4 w-4 stroke-[2.5]" />
+                <span>🏦 Saldo di Rekening M-Banking</span>
+              </span>
+              <span className="text-base sm:text-lg font-black text-black">
+                {formatRupiah(walletBreakdown.balanceInBank)}
+              </span>
+            </div>
+
+            <div className="p-2 bg-white border-2 border-black space-y-1 text-[11px]">
+              <div className="flex items-center justify-between text-black/80 font-bold">
+                <span>&bull; Sisa Dana Titipan Belanja di Bank:</span>
+                <span className="font-black text-black">{formatRupiah(walletBreakdown.advanceBankBalance)}</span>
+              </div>
+              <div className="flex items-center justify-between text-black/80 font-bold">
+                <span>&bull; Siap Ditransferkan:</span>
+                <span className="font-black text-blue-700">{formatRupiah(walletBreakdown.balanceInBank)}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

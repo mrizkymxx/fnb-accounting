@@ -1,9 +1,10 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import { Outlet, Supplier, Purchase, CashCollection, AdvanceFundBatch, CashOnHandSummary } from '@/types/database';
+import { Outlet, Supplier, Purchase, CashCollection, AdvanceFundBatch, CashOnHandSummary, WalletBreakdown } from '@/types/database';
 import { INITIAL_OUTLETS, INITIAL_SUPPLIERS, INITIAL_PURCHASES, INITIAL_COLLECTIONS, INITIAL_ADVANCE_BATCHES } from '@/lib/mockData';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { formatRupiah } from '@/lib/formatters';
 
 interface AppContextType {
   outlets: Outlet[];
@@ -29,7 +30,7 @@ interface AppContextType {
   addCashCollection: (collection: Omit<CashCollection, 'id' | 'created_at'>) => Promise<CashCollection>;
   updateCashCollection: (id: string, collection: Partial<CashCollection>) => Promise<void>;
   deleteCashCollection: (id: string) => Promise<void>;
-  depositCashOnHand: (outletId: string, bankName: string, bankAccount: string, slipUrl?: string, notes?: string) => Promise<void>;
+  depositCashOnHand: (outletId: string, bankName: string, bankAccount: string, slipUrl?: string, notes?: string, atmDepositAmount?: number, cashRemainderToAdvance?: number) => Promise<void>;
 
   // 4. Advance Fund CRUD
   addAdvanceFundBatch: (batch: Omit<AdvanceFundBatch, 'id' | 'created_at' | 'remaining_amount' | 'status'>) => Promise<AdvanceFundBatch>;
@@ -44,6 +45,7 @@ interface AppContextType {
   deleteSupplier: (id: string) => Promise<void>;
 
   // Computed Metrics
+  walletBreakdown: WalletBreakdown;
   cashOnHandSummaries: CashOnHandSummary[];
   totalHeldAllOutlets: number;
   totalAdvanceRemainingAll: number;
@@ -297,7 +299,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setPurchases(prev => [newPurchase, ...prev]);
 
-    if (newPurData.payment_source === 'advance_transfer' && newPurData.advance_batch_id && newPurData.advance_batch_id !== 'auto_fifo') {
+    if ((newPurData.payment_source === 'advance_transfer' || newPurData.payment_source === 'advance_cash') && newPurData.advance_batch_id && newPurData.advance_batch_id !== 'auto_fifo') {
       setAdvanceBatches(prev => prev.map(b => {
         if (b.id === newPurData.advance_batch_id) {
           const newRemaining = Math.max(0, b.remaining_amount - newPurData.total_amount);
@@ -311,7 +313,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }));
     }
 
-    if (newPurData.payment_source === 'advance_transfer' && (!newPurData.advance_batch_id || newPurData.advance_batch_id === 'auto_fifo')) {
+    if ((newPurData.payment_source === 'advance_transfer' || newPurData.payment_source === 'advance_cash') && (!newPurData.advance_batch_id || newPurData.advance_batch_id === 'auto_fifo')) {
       let needed = newPurData.total_amount;
       setAdvanceBatches(prev => {
         return prev.map(b => {
@@ -490,8 +492,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const depositCashOnHand = async (outletId: string, bankName: string, bankAccount: string, slipUrl?: string, notes?: string) => {
+  const depositCashOnHand = async (
+    outletId: string,
+    bankName: string,
+    bankAccount: string,
+    slipUrl?: string,
+    notes?: string,
+    atmDepositAmount?: number,
+    cashRemainderToAdvance?: number
+  ) => {
     const nowIso = new Date().toISOString();
+    const outlet = outlets.find(o => o.id === outletId);
+
     setCollections(prev => prev.map(c => {
       if (c.outlet_id === outletId && c.status === 'held_by_me') {
         return {
@@ -506,6 +518,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return c;
     }));
+
+    // Jika ada sisa pecahan ATM yang tidak bisa disetor (e.g. 44.300),
+    // otomatis buat batch dana titipan berbentuk cash di tangan
+    if (cashRemainderToAdvance && cashRemainderToAdvance > 0) {
+      const remainderBatchId = `batch_atm_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+      const remainderBatch: AdvanceFundBatch = {
+        id: remainderBatchId,
+        outlet_id: outletId,
+        sender_source: `Sisa Pecahan Setor ATM ${outlet?.name || ''}`,
+        batch_name: `Cash Kembalian ATM Setor ${outlet?.name || ''} (${formatRupiah(cashRemainderToAdvance)})`,
+        received_at: nowIso,
+        initial_amount: cashRemainderToAdvance,
+        remaining_amount: cashRemainderToAdvance,
+        status: 'active',
+        notes: `Sisa uang fisik tidak masuk mesin ATM saat transfer lunas ke pusat. Berubah jadi Cash Dana Titipan.`,
+        proof_image_url: slipUrl,
+        created_at: nowIso,
+      };
+
+      setAdvanceBatches(prev => [remainderBatch, ...prev]);
+
+      const client = supabase;
+      if (isSupabaseConfigured && client) {
+        client.from('advance_fund_batches').insert(remainderBatch).then();
+      }
+    }
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
@@ -590,6 +628,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const unpaidTempoCount = unpaidTempoList.length;
   const unpaidTempoTotal = unpaidTempoList.reduce((acc, p) => acc + p.total_amount, 0);
 
+  const walletBreakdown: WalletBreakdown = useMemo(() => {
+    // Sisa titipan yang berbentuk cash fisik (hasil pecahan ATM / cash)
+    const advanceCashHolding = advanceBatches
+      .filter(b => b.status === 'active' && (
+        b.sender_source.toLowerCase().includes('atm') ||
+        b.sender_source.toLowerCase().includes('cash') ||
+        b.batch_name.toLowerCase().includes('cash') ||
+        b.batch_name.toLowerCase().includes('kembalian')
+      ))
+      .reduce((acc, b) => acc + b.remaining_amount, 0);
+
+    // Sisa titipan yang berbentuk saldo di rekening M-Banking
+    const advanceBankBalance = Math.max(0, totalAdvanceRemainingAll - advanceCashHolding);
+
+    const cashierHeldTotal = totalHeldAllOutlets;
+    const cashInWallet = cashierHeldTotal + advanceCashHolding;
+    const balanceInBank = advanceBankBalance;
+    const totalRealMoney = cashInWallet + balanceInBank;
+
+    return {
+      cashInWallet,
+      balanceInBank,
+      totalRealMoney,
+      advanceCashHolding,
+      advanceBankBalance,
+      cashierHeldTotal,
+    };
+  }, [advanceBatches, totalAdvanceRemainingAll, totalHeldAllOutlets]);
+
   const todayStr = new Date().toISOString().split('T')[0];
   const todayExpenseTotal = useMemo(() => {
     return purchases
@@ -626,6 +693,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addSupplier,
         updateSupplier,
         deleteSupplier,
+        walletBreakdown,
         cashOnHandSummaries,
         totalHeldAllOutlets,
         totalAdvanceRemainingAll,
