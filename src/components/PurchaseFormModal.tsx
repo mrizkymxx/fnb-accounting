@@ -450,11 +450,41 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             )}
           </div>
 
+          {/* Upload Foto Nota */}
+          <div className="p-3 bg-white border-3 border-black shadow-[3px_3px_0px_#121212]">
+            <label className="block text-xs font-black text-black uppercase mb-1.5">
+              Foto Nota / Struk Belanja
+            </label>
+            <label className="w-full cursor-pointer flex items-center justify-center gap-2 p-3 bg-[#FFFDF5] border-2 border-dashed border-black hover:bg-slate-50 text-xs font-black uppercase transition-all">
+              <Camera className="h-4 w-4 stroke-[2.5]" />
+              <span>{receiptImage ? '✓ Nota Sudah Terlampir — Ketuk untuk Ganti' : 'Ketuk untuk Upload Foto Nota'}</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleReceiptImageChange}
+                className="hidden"
+              />
+            </label>
+            {receiptImage && (
+              <div className="flex items-center gap-2 mt-2 bg-[#FFE600] p-2 border-2 border-black">
+                <img src={receiptImage} alt="Nota" className="h-10 w-10 object-cover border border-black" />
+                <span className="text-xs font-black text-black">✓ NOTA TERLAMPIR</span>
+                <button
+                  type="button"
+                  onClick={() => setReceiptImage(null)}
+                  className="ml-auto text-[10px] font-bold text-red-600 hover:text-red-800 border border-red-600 px-1.5 py-0.5"
+                >
+                  Hapus
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Detail Item Barang */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-black uppercase">
-                Rincian Barang & Estimasi Harga ({items.length} Item)
+                Rincian Barang & Harga ({items.length} Item)
               </label>
               <button
                 type="button"
@@ -509,7 +539,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                   <div className="col-span-4 sm:col-span-2">
                     <input
                       type="number"
-                      placeholder="Estimasi Harga"
+                      placeholder="Harga"
                       value={item.unit_price || ''}
                       onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
                       className="w-full bg-[#FFFDF5] border-2 border-black p-1.5 text-xs font-black text-black text-right focus:outline-none"
@@ -534,46 +564,16 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             <div className="flex justify-between items-center p-3.5 sm:p-4 bg-[#FFE600] border-3 sm:border-4 border-black shadow-[3px_3px_0px_#121212]">
               <div>
                 <span className="text-xs font-black text-black uppercase tracking-wider block">
-                  Total Estimasi Belanja:
+                  Total Belanja:
                 </span>
                 <span className="text-[10px] font-bold text-black/70">
-                  Dihitung otomatis dari 297 katalog resep
+                  Dihitung otomatis dari rincian item
                 </span>
               </div>
               <span className="text-lg sm:text-2xl font-black text-black">
                 {formatRupiah(totalCalculated)}
               </span>
             </div>
-          </div>
-
-          {/* Upload Foto Nota */}
-          <div>
-            <label className="block text-xs font-black text-black uppercase mb-1">
-              Foto Nota / Struk (Opsional)
-            </label>
-            <label className="w-full cursor-pointer flex items-center justify-center gap-2 p-3 bg-white border-3 border-black shadow-[3px_3px_0px_#121212] hover:bg-slate-50 text-xs font-black uppercase">
-              <Camera className="h-4 w-4 stroke-[2.5]" />
-              <span>{receiptImage ? '✓ Nota Sudah Terlampir — Ganti Foto' : 'Upload Foto Nota / Struk'}</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleReceiptImageChange}
-                className="hidden"
-              />
-            </label>
-            {receiptImage && (
-              <div className="flex items-center gap-2 mt-2 bg-white p-2 border-2 border-black">
-                <img src={receiptImage} alt="Nota" className="h-10 w-10 object-cover border border-black" />
-                <span className="text-xs font-black text-black">✓ NOTA TERLAMPIR</span>
-                <button
-                  type="button"
-                  onClick={() => setReceiptImage(null)}
-                  className="ml-auto text-[10px] font-bold text-red-600 hover:text-red-800"
-                >
-                  Hapus
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Catatan Tambahan */}
