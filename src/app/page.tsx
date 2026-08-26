@@ -1,69 +1,204 @@
-import Image from "next/image";
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { AppProvider } from '@/context/AppContext';
+import { Purchase, CashCollection } from '@/types/database';
+import { Navbar } from '@/components/Navbar';
+import { DashboardView } from '@/components/DashboardView';
+import { PurchasesListView } from '@/components/PurchasesListView';
+import { AdvanceFundView } from '@/components/AdvanceFundView';
+import { CashTrackerView } from '@/components/CashTrackerView';
+import { TempoManagerView } from '@/components/TempoManagerView';
+import { SuppliersView } from '@/components/SuppliersView';
+import { PurchaseFormModal } from '@/components/PurchaseFormModal';
+import { AdvanceFundModal } from '@/components/AdvanceFundModal';
+import { CashCollectionModal } from '@/components/CashCollectionModal';
+import { DepositBankModal } from '@/components/DepositBankModal';
+import { ReceiptPreviewModal } from '@/components/ReceiptPreviewModal';
+import { LoginScreen } from '@/components/LoginScreen';
+
+function MainApp() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers'>('dashboard');
+
+  // Check auth session
+  useEffect(() => {
+    const session = localStorage.getItem('fnb_auth_session');
+    setIsAuthenticated(session === 'authenticated');
+  }, []);
+
+  // Modals state
+  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
+
+  const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
+  const [editingCollection, setEditingCollection] = useState<CashCollection | null>(null);
+
+  const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
+  const [depositModalOutletId, setDepositModalOutletId] = useState<string | null>(null);
+
+  const [previewReceipt, setPreviewReceipt] = useState<{ url: string; title: string } | null>(null);
+
+  const handleOpenNewPurchase = () => {
+    setEditingPurchase(null);
+    setIsPurchaseModalOpen(true);
+  };
+
+  const handleEditPurchase = (purchase: Purchase) => {
+    setEditingPurchase(purchase);
+    setIsPurchaseModalOpen(true);
+  };
+
+  const handleOpenCollectCash = () => {
+    setEditingCollection(null);
+    setIsCollectionModalOpen(true);
+  };
+
+  const handleEditCollection = (collection: CashCollection) => {
+    setEditingCollection(collection);
+    setIsCollectionModalOpen(true);
+  };
+
+  const handleOpenDeposit = (outletId: string) => {
+    setDepositModalOutletId(outletId);
+  };
+
+  const handleViewReceipt = (url: string, title: string) => {
+    setPreviewReceipt({ url, title });
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('fnb_auth_session');
+    setIsAuthenticated(false);
+  };
+
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-[#FCFAF2] flex items-center justify-center">
+        <div className="text-xs font-black uppercase bg-[#FFE600] border-2 border-black px-3 py-1.5 shadow-[2px_2px_0px_#121212]">
+          Memeriksa Akses...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginScreen onSuccess={() => setIsAuthenticated(true)} />;
+  }
+
+  return (
+    <div className="min-h-screen text-black flex flex-col antialiased selection:bg-[#FFE600] selection:text-black font-sans">
+      {/* Top Navbar with Logout option */}
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onOpenNewPurchase={handleOpenNewPurchase}
+        onOpenCollectCash={handleOpenCollectCash}
+        onOpenNewAdvance={() => setIsAdvanceModalOpen(true)}
+      />
+
+      {/* Main View Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
+        {/* Quick Logout Bar on Desktop */}
+        <div className="hidden sm:flex justify-end mb-2">
+          <button
+            onClick={handleLogout}
+            className="text-[10px] font-black uppercase text-black/60 hover:text-black bg-white border border-black px-2 py-0.5"
+          >
+            🔒 Kunci / Logout
+          </button>
+        </div>
+
+        {activeTab === 'dashboard' && (
+          <DashboardView
+            onOpenNewPurchase={handleOpenNewPurchase}
+            onOpenCollectCash={handleOpenCollectCash}
+            onOpenNewAdvance={() => setIsAdvanceModalOpen(true)}
+            onSelectOutletDeposit={handleOpenDeposit}
+            onViewReceipt={handleViewReceipt}
+            onGoToTempo={() => setActiveTab('tempo')}
+            onGoToAdvance={() => setActiveTab('advance_funds')}
+          />
+        )}
+
+        {activeTab === 'purchases' && (
+          <PurchasesListView
+            onOpenNewPurchase={handleOpenNewPurchase}
+            onEditPurchase={handleEditPurchase}
+            onViewReceipt={handleViewReceipt}
+          />
+        )}
+
+        {activeTab === 'advance_funds' && (
+          <AdvanceFundView
+            onOpenNewAdvance={() => setIsAdvanceModalOpen(true)}
+            onOpenNewPurchase={handleOpenNewPurchase}
+            onViewReceipt={handleViewReceipt}
+          />
+        )}
+
+        {activeTab === 'cash_tracker' && (
+          <CashTrackerView
+            onOpenCollectCash={handleOpenCollectCash}
+            onEditCollection={handleEditCollection}
+            onSelectOutletDeposit={handleOpenDeposit}
+            onViewReceipt={handleViewReceipt}
+          />
+        )}
+
+        {activeTab === 'tempo' && (
+          <TempoManagerView onViewReceipt={handleViewReceipt} />
+        )}
+
+        {activeTab === 'suppliers' && (
+          <SuppliersView />
+        )}
+      </main>
+
+      {/* Modals */}
+      <PurchaseFormModal
+        isOpen={isPurchaseModalOpen}
+        initialData={editingPurchase}
+        onClose={() => {
+          setIsPurchaseModalOpen(false);
+          setEditingPurchase(null);
+        }}
+      />
+
+      <AdvanceFundModal
+        isOpen={isAdvanceModalOpen}
+        onClose={() => setIsAdvanceModalOpen(false)}
+      />
+
+      <CashCollectionModal
+        isOpen={isCollectionModalOpen}
+        initialData={editingCollection}
+        onClose={() => {
+          setIsCollectionModalOpen(false);
+          setEditingCollection(null);
+        }}
+      />
+
+      <DepositBankModal
+        isOpen={Boolean(depositModalOutletId)}
+        outletId={depositModalOutletId || ''}
+        onClose={() => setDepositModalOutletId(null)}
+      />
+
+      <ReceiptPreviewModal
+        isOpen={Boolean(previewReceipt)}
+        imageUrl={previewReceipt?.url || null}
+        title={previewReceipt?.title}
+        onClose={() => setPreviewReceipt(null)}
+      />
+    </div>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <AppProvider>
+      <MainApp />
+    </AppProvider>
   );
 }
