@@ -76,15 +76,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Initial Load from Supabase Cloud First, Fallback to LocalStorage
   useEffect(() => {
     async function loadData() {
-      // 1. Coba load dari Supabase jika terkonfigurasi
-      if (isSupabaseConfigured && supabase) {
+      const client = supabase;
+      if (isSupabaseConfigured && client) {
         try {
           const [outletsRes, suppliersRes, batchesRes, purchasesRes, collectionsRes] = await Promise.all([
-            supabase.from('outlets').select('*'),
-            supabase.from('suppliers').select('*'),
-            supabase.from('advance_fund_batches').select('*'),
-            supabase.from('purchases').select('*, items:purchase_items(*)').order('purchase_date', { ascending: false }),
-            supabase.from('cash_collections').select('*').order('collected_at', { ascending: false }),
+            client.from('outlets').select('*'),
+            client.from('suppliers').select('*'),
+            client.from('advance_fund_batches').select('*'),
+            client.from('purchases').select('*, items:purchase_items(*)').order('purchase_date', { ascending: false }),
+            client.from('cash_collections').select('*').order('collected_at', { ascending: false }),
           ]);
 
           if (outletsRes.data && outletsRes.data.length > 0) {
@@ -102,7 +102,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // 2. Fallback ke LocalStorage jika Supabase kosong / offline
+      // Fallback LocalStorage
       try {
         const storedOutlets = localStorage.getItem(STORAGE_KEYS.OUTLETS);
         const storedSuppliers = localStorage.getItem(STORAGE_KEYS.SUPPLIERS);
@@ -143,9 +143,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [outlets, suppliers, purchases, collections, advanceBatches, isLoaded]);
 
-  // ==========================================
   // 1. OUTLET CRUD
-  // ==========================================
   const addOutlet = async (data: Omit<Outlet, 'id' | 'created_at'>): Promise<Outlet> => {
     const id = `out_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const newOutlet: Outlet = {
@@ -155,8 +153,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setOutlets(prev => [...prev, newOutlet]);
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('outlets').insert({
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('outlets').insert({
         id: newOutlet.id,
         name: newOutlet.name,
         type: newOutlet.type,
@@ -171,8 +170,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateOutlet = async (id: string, data: Partial<Outlet>) => {
     setOutlets(prev => prev.map(o => o.id === id ? { ...o, ...data } : o));
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('outlets').update(data).eq('id', id).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('outlets').update(data).eq('id', id).then();
     }
   };
 
@@ -180,14 +180,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setOutlets(prev => prev.filter(o => o.id !== id));
     if (selectedOutletId === id) setSelectedOutletId('all');
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('outlets').delete().eq('id', id).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('outlets').delete().eq('id', id).then();
     }
   };
 
-  // ==========================================
   // 2. ADVANCE FUND CRUD
-  // ==========================================
   const addAdvanceFundBatch = async (
     data: Omit<AdvanceFundBatch, 'id' | 'created_at' | 'remaining_amount' | 'status'>
   ): Promise<AdvanceFundBatch> => {
@@ -201,8 +200,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setAdvanceBatches(prev => [newBatch, ...prev]);
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('advance_fund_batches').insert(newBatch).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('advance_fund_batches').insert(newBatch).then();
     }
 
     return newBatch;
@@ -210,8 +210,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateAdvanceFundBatch = async (id: string, data: Partial<AdvanceFundBatch>) => {
     setAdvanceBatches(prev => prev.map(b => b.id === id ? { ...b, ...data } : b));
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('advance_fund_batches').update(data).eq('id', id).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('advance_fund_batches').update(data).eq('id', id).then();
     }
   };
 
@@ -223,8 +224,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return p;
     }));
     setAdvanceBatches(prev => prev.filter(b => b.id !== batchId));
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('advance_fund_batches').delete().eq('id', batchId).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('advance_fund_batches').delete().eq('id', batchId).then();
     }
   };
 
@@ -235,8 +237,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return b;
     }));
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('advance_fund_batches').update({ status: 'closed' }).eq('id', batchId).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('advance_fund_batches').update({ status: 'closed' }).eq('id', batchId).then();
     }
   };
 
@@ -274,19 +277,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setAdvanceBatches(prev => [newConsolidatedBatch, ...prev]);
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('advance_fund_batches').insert(newConsolidatedBatch).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('advance_fund_batches').insert(newConsolidatedBatch).then();
       batchIds.forEach(id => {
-        supabase.from('advance_fund_batches').update({ status: 'closed' }).eq('id', id).then();
+        client.from('advance_fund_batches').update({ status: 'closed' }).eq('id', id).then();
       });
     }
 
     return newConsolidatedBatch;
   };
 
-  // ==========================================
   // 3. PURCHASE CRUD
-  // ==========================================
   const addPurchase = async (newPurData: Omit<Purchase, 'id' | 'created_at'>): Promise<Purchase> => {
     const id = `pur_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newPurchase: Purchase = {
@@ -330,8 +332,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('purchases').insert({
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('purchases').insert({
         id: newPurchase.id,
         outlet_id: newPurchase.outlet_id,
         supplier_id: newPurchase.supplier_id,
@@ -355,7 +358,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             unit_price: it.unit_price,
             subtotal: it.subtotal,
           }));
-          supabase.from('purchase_items').insert(itemsToInsert).then();
+          client.from('purchase_items').insert(itemsToInsert).then();
         }
       });
     }
@@ -390,8 +393,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setPurchases(prev => prev.map(p => p.id === id ? newPurchase : p));
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('purchases').update({
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('purchases').update({
         outlet_id: newPurchase.outlet_id,
         supplier_id: newPurchase.supplier_id,
         supplier_name: newPurchase.supplier_name,
@@ -425,8 +429,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setPurchases(prev => prev.filter(p => p.id !== id));
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('purchases').delete().eq('id', id).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('purchases').delete().eq('id', id).then();
     }
   };
 
@@ -443,8 +448,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return p;
     }));
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('purchases').update({
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('purchases').update({
         tempo_status: status,
         tempo_paid_at: status === 'paid' ? new Date().toISOString() : null,
         tempo_payment_proof_url: proofUrl || null,
@@ -452,9 +458,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // ==========================================
   // 4. CASH COLLECTION CRUD
-  // ==========================================
   const addCashCollection = async (data: Omit<CashCollection, 'id' | 'created_at'>): Promise<CashCollection> => {
     const id = `col_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newCol: CashCollection = {
@@ -464,8 +468,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setCollections(prev => [newCol, ...prev]);
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('cash_collections').insert(newCol).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('cash_collections').insert(newCol).then();
     }
 
     return newCol;
@@ -473,15 +478,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateCashCollection = async (id: string, data: Partial<CashCollection>) => {
     setCollections(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('cash_collections').update(data).eq('id', id).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('cash_collections').update(data).eq('id', id).then();
     }
   };
 
   const deleteCashCollection = async (id: string) => {
     setCollections(prev => prev.filter(c => c.id !== id));
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('cash_collections').delete().eq('id', id).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('cash_collections').delete().eq('id', id).then();
     }
   };
 
@@ -502,8 +509,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return c;
     }));
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('cash_collections').update({
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('cash_collections').update({
         status: 'deposited_to_bank',
         deposited_at: nowIso,
         deposit_bank: bankName,
@@ -513,9 +521,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // ==========================================
   // 5. SUPPLIER CRUD
-  // ==========================================
   const addSupplier = async (data: Omit<Supplier, 'id' | 'created_at'>): Promise<Supplier> => {
     const id = `sup_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newSup: Supplier = {
@@ -525,8 +531,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setSuppliers(prev => [...prev, newSup]);
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('suppliers').insert(newSup).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('suppliers').insert(newSup).then();
     }
 
     return newSup;
@@ -534,15 +541,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateSupplier = async (id: string, data: Partial<Supplier>) => {
     setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('suppliers').update(data).eq('id', id).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('suppliers').update(data).eq('id', id).then();
     }
   };
 
   const deleteSupplier = async (id: string) => {
     setSuppliers(prev => prev.filter(s => s.id !== id));
-    if (isSupabaseConfigured && supabase) {
-      supabase.from('suppliers').delete().eq('id', id).then();
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      client.from('suppliers').delete().eq('id', id).then();
     }
   };
 
