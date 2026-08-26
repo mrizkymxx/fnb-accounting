@@ -2,25 +2,26 @@
 
 import React, { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
-import { Purchase, PurchaseItem, PaymentSource } from '@/types/database';
+import { PurchaseItem, PaymentSource } from '@/types/database';
 import { formatRupiah } from '@/lib/formatters';
-import { uploadReceiptFile } from '@/lib/storageUtils';
-import { compressReceiptImage } from '@/lib/imageCompressor';
-import { INGREDIENTS_CATALOG } from '@/lib/ingredientsCatalog';
 import {
   X,
   Plus,
   Trash2,
-  Camera,
   AlertCircle,
   Sparkles,
-  Loader2
+  Loader2,
+  Bot,
+  Send,
+  CheckCircle2,
+  Calculator,
+  ArrowRight
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface PurchaseFormModalProps {
   isOpen: boolean;
-  initialData?: Purchase | null;
+  initialData?: any | null;
   onClose: () => void;
 }
 
@@ -31,9 +32,29 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 }) => {
   const { outlets, suppliers, advanceBatches, addPurchase, updatePurchase, selectedOutletId } = useApp();
 
+  const [inputMode, setInputMode] = useState<'chatbot' | 'manual'>('chatbot');
+  const [chatPrompt, setChatPrompt] = useState<string>(
+`Order Prima Sushi :
+- Keju Prochiz Gold 3px
+- B.Putih 1/2kg
+- Kentang 2 Biji besar / 3 Biji sedang
+- Sawi Sendok 7
+- Sabun cuci piring 2 Jrigen
+- Selada 1plastik
+- Kol putih ukuran kecil 1
+- Jeruk Nipis 6biji yang matang/ banyak airnya
+- Toge 500 gram
+- Gula 2kg
+- Udang 1/2kg
+- Ayam Paha`
+  );
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
+  const [aiSummaryMsg, setAiSummaryMsg] = useState<string | null>(null);
+
+  // Form states
   const [outletId, setOutletId] = useState<string>('out_oklah');
   const [supplierId, setSupplierId] = useState<string>('');
-  const [supplierName, setSupplierName] = useState<string>('');
+  const [supplierName, setSupplierName] = useState<string>('Pasar Tradisional / Supplier');
   const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [paymentSource, setPaymentSource] = useState<PaymentSource>('advance_transfer');
   const [advanceBatchId, setAdvanceBatchId] = useState<string>('auto_fifo');
@@ -43,10 +64,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
   const [notes, setNotes] = useState<string>('');
-  const [receiptImage, setReceiptImage] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isScanningAI, setIsScanningAI] = useState(false);
-  const [aiScanStatus, setAiScanStatus] = useState<string | null>(null);
 
   const [items, setItems] = useState<PurchaseItem[]>([
     { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
@@ -63,23 +80,21 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       setIsTempo(initialData.is_tempo);
       setTempoDueDate(initialData.tempo_due_date || '');
       setNotes(initialData.notes || '');
-      setReceiptImage(initialData.receipt_image_url || null);
-      setAiScanStatus(null);
       setItems(initialData.items && initialData.items.length > 0 ? initialData.items : [
         { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
       ]);
+      setInputMode('manual');
     } else {
       setOutletId(selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || 'out_oklah'));
       setSupplierId('');
-      setSupplierName('');
+      setSupplierName('Pasar Tradisional / Supplier');
       setPurchaseDate(new Date().toISOString().split('T')[0]);
       setPaymentSource('advance_transfer');
       setAdvanceBatchId('auto_fifo');
       setIsTempo(false);
       setNotes('');
-      setReceiptImage(null);
-      setAiScanStatus(null);
-      setItems([{ id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }]);
+      setAiSummaryMsg(null);
+      setInputMode('chatbot');
     }
   }, [initialData, isOpen, selectedOutletId, outlets]);
 
@@ -93,44 +108,76 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     .filter(b => b.status === 'active')
     .reduce((acc, b) => acc + b.remaining_amount, 0);
 
-  const handleSupplierSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const sId = e.target.value;
-    setSupplierId(sId);
+  // Proses teks mentah chat via AI Groq (Llama 3.3 70B Versatile)
+  const handleProcessAIChat = async () => {
+    if (!chatPrompt.trim()) return;
 
-    const sup = suppliers.find(s => s.id === sId);
-    if (sup) {
-      setSupplierName(sup.name);
-      if (sup.payment_terms === 'tempo') {
-        setIsTempo(true);
-        setPaymentSource('tempo');
-        const days = sup.default_tempo_days || 14;
-        setTempoDays(days);
-        const due = new Date();
-        due.setDate(due.getDate() + days);
-        setTempoDueDate(due.toISOString().split('T')[0]);
+    try {
+      setIsProcessingAI(true);
+      setAiSummaryMsg(null);
+
+      const currentOutletObj = outlets.find(o => o.id === outletId);
+
+      const res = await fetch('/api/parse-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          textPrompt: chatPrompt,
+          defaultOutlet: currentOutletObj?.name || 'Oklah'
+        })
+      });
+
+      const json = await res.json();
+
+      if (res.ok && json.data) {
+        const aiData = json.data;
+
+        if (aiData.detected_outlet_name) {
+          const matchedOutlet = outlets.find(
+            o => o.name.toLowerCase().includes(aiData.detected_outlet_name.toLowerCase()) ||
+                 aiData.detected_outlet_name.toLowerCase().includes(o.name.toLowerCase())
+          );
+          if (matchedOutlet) {
+            setOutletId(matchedOutlet.id);
+          }
+        }
+
+        if (aiData.supplier_suggestion) {
+          setSupplierName(aiData.supplier_suggestion);
+        }
+
+        if (Array.isArray(aiData.items) && aiData.items.length > 0) {
+          setItems(aiData.items.map((it: any, idx: number) => ({
+            id: `item_chat_${Date.now()}_${idx}`,
+            item_name: it.item_name || it.raw_text,
+            quantity: Number(it.quantity) || 1,
+            unit: it.unit || 'pcs',
+            unit_price: Number(it.estimated_unit_price) || 0,
+            subtotal: Number(it.estimated_subtotal) || ((Number(it.quantity) || 1) * (Number(it.estimated_unit_price) || 0)),
+          })));
+
+          setAiSummaryMsg(aiData.summary_message || `✓ Berhasil menghitung estimasi harga untuk ${aiData.items.length} item barang.`);
+
+          try {
+            confetti({
+              particleCount: 70,
+              spread: 60,
+              origin: { y: 0.6 }
+            });
+          } catch {}
+        }
       }
-    } else {
-      setSupplierName('');
+    } catch (err) {
+      console.error('Gagal memproses chat AI:', err);
+      alert('Gagal memproses teks dengan AI. Silakan coba lagi atau gunakan input manual.');
+    } finally {
+      setIsProcessingAI(false);
     }
   };
 
   const handleItemChange = (index: number, field: keyof PurchaseItem, value: any) => {
     const updated = [...items];
     const item = { ...updated[index], [field]: value };
-
-    // Auto-fill satuan dan estimasi harga jika nama bahan cocok dengan kamus Excel
-    if (field === 'item_name') {
-      const match = INGREDIENTS_CATALOG.find(
-        cat => cat.name.toLowerCase() === value.toString().trim().toLowerCase()
-      );
-      if (match) {
-        if (match.unit) item.unit = match.unit.toLowerCase();
-        if (match.price > 0 && !item.unit_price) {
-          item.unit_price = match.price;
-          item.subtotal = (item.quantity || 1) * match.price;
-        }
-      }
-    }
 
     if (field === 'quantity' || field === 'unit_price') {
       const q = field === 'quantity' ? Number(value) : item.quantity;
@@ -156,91 +203,10 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
   const totalCalculated = items.reduce((acc, curr) => acc + (curr.subtotal || 0), 0);
 
-  // Kompresi + Upload ke Cloud Supabase Storage + AI Scan OCR otomatis (Groq Vision)
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsUploading(true);
-      setIsScanningAI(true);
-      setAiScanStatus('Sedang membaca tulisan nota dengan AI Groq Vision...');
-
-      // 1. Dapatkan base64 terkompresi
-      const compressedBase64 = await compressReceiptImage(file, 1200, 0.72);
-
-      // 2. Upload async ke Supabase Storage
-      uploadReceiptFile(file, 'purchases').then(url => {
-        setReceiptImage(url);
-        setIsUploading(false);
-      }).catch(() => {
-        setReceiptImage(compressedBase64);
-        setIsUploading(false);
-      });
-
-      // 3. Scan OCR AI Groq (Llama 3.2 Vision)
-      const res = await fetch('/api/ocr-receipt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: compressedBase64 })
-      });
-
-      const json = await res.json();
-
-      if (res.ok && json.data) {
-        const aiData = json.data;
-        let filledCount = 0;
-
-        if (aiData.supplier_name && aiData.supplier_name !== 'Toko/Supplier') {
-          setSupplierName(aiData.supplier_name);
-          filledCount++;
-        }
-        if (aiData.purchase_date) {
-          setPurchaseDate(aiData.purchase_date);
-          filledCount++;
-        }
-        if (aiData.notes) {
-          setNotes(aiData.notes);
-        }
-        if (Array.isArray(aiData.items) && aiData.items.length > 0) {
-          setItems(aiData.items.map((it: any, idx: number) => ({
-            id: `item_ai_${Date.now()}_${idx}`,
-            item_name: it.item_name || 'Barang',
-            quantity: Number(it.quantity) || 1,
-            unit: it.unit || 'pcs',
-            unit_price: Number(it.unit_price) || 0,
-            subtotal: Number(it.subtotal) || ((Number(it.quantity) || 1) * (Number(it.unit_price) || 0)),
-          })));
-          filledCount += aiData.items.length;
-        }
-
-        if (filledCount > 0) {
-          setAiScanStatus(`✓ Berhasil mencocokkan & mengisi ${aiData.items?.length || 0} barang dari kamus resep!`);
-          try {
-            confetti({
-              particleCount: 60,
-              spread: 50,
-              origin: { y: 0.7 }
-            });
-          } catch {}
-        } else {
-          setAiScanStatus('⚠️ Foto tersimpan. Tulisan nota tidak terbaca jelas, silakan lengkapi item di bawah.');
-        }
-      } else {
-        setAiScanStatus('⚠️ Foto tersimpan. AI tidak mendeteksi tulisan struk.');
-      }
-    } catch (err) {
-      console.error('Gagal scan nota AI:', err);
-      setAiScanStatus('⚠️ Gagal terhubung ke AI Scanner. Foto tetap tersimpan, silakan isi rincian manual.');
-    } finally {
-      setIsScanningAI(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const finalSupplierName = supplierName.trim() || 'Supplier Umum';
+    const finalSupplierName = supplierName.trim() || 'Pasar Tradisional / Supplier';
     const validItems = items.filter(it => it.item_name.trim() !== '');
 
     if (validItems.length === 0) {
@@ -259,7 +225,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       is_tempo: isTempo,
       tempo_due_date: isTempo ? tempoDueDate : undefined,
       tempo_status: isTempo ? (initialData?.tempo_status || 'unpaid') : undefined,
-      receipt_image_url: receiptImage || undefined,
       notes: notes.trim() || undefined,
       items: validItems,
     };
@@ -279,14 +244,12 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center justify-between p-3.5 sm:p-4 border-b-4 border-black bg-[#FFE600] shrink-0">
           <div>
-            <h2 className="text-base sm:text-lg font-black text-black uppercase tracking-tight flex items-center gap-1.5">
-              <span>{initialData ? '✏️ Edit Belanja' : '🧾 Catat Belanja & Scan Nota'}</span>
-              <span className="text-[10px] bg-[#00F0FF] text-black border border-black px-1.5 py-0.2 rounded font-black uppercase">
-                AI Groq Vision
-              </span>
+            <h2 className="text-base sm:text-lg font-black text-black uppercase tracking-tight flex items-center gap-2">
+              <Calculator className="h-5 w-5 stroke-[2.5]" />
+              <span>{initialData ? '✏️ Edit Belanja' : '🤖 Chatbot Estimasi & Input Belanja'}</span>
             </h2>
             <p className="text-[11px] font-bold text-black/70">
-              Mendukung nota tulisan tangan pasar &bull; Otomatis dicocokkan ke 297 kamus bahan Oklah & Prima
+              Ketik atau paste daftar belanja mentah &rarr; AI otomatis hitung estimasi harga dari kamus resep
             </p>
           </div>
           <button
@@ -297,72 +260,89 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
           </button>
         </div>
 
+        {/* Mode Switcher Tabs */}
+        <div className="flex bg-white border-b-3 border-black p-1">
+          <button
+            type="button"
+            onClick={() => setInputMode('chatbot')}
+            className={`flex-1 py-2 text-xs font-black uppercase transition-all flex items-center justify-center gap-1.5 ${
+              inputMode === 'chatbot'
+                ? 'bg-[#00F0FF] text-black border-2 border-black shadow-[2px_2px_0px_#121212]'
+                : 'text-black/70 hover:text-black'
+            }`}
+          >
+            <Bot className="h-4 w-4 stroke-[2.5]" />
+            <span>Chatbot AI Estimator</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputMode('manual')}
+            className={`flex-1 py-2 text-xs font-black uppercase transition-all flex items-center justify-center gap-1.5 ${
+              inputMode === 'manual'
+                ? 'bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_#121212]'
+                : 'text-black/70 hover:text-black'
+            }`}
+          >
+            <span>Tabel Rincian & Pembayaran</span>
+          </button>
+        </div>
+
         {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="p-3.5 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
-          {/* Upload Foto Nota & AI Auto Scan Bar */}
-          <div className="p-3.5 bg-[#00F0FF]/15 border-3 border-black shadow-[3px_3px_0px_#121212] space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-black text-black uppercase flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-[#FF4343]" />
-                <span>Foto Nota / Struk Pasar (Auto-Scan AI)</span>
-              </label>
-              {isScanningAI && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase bg-[#FFE600] border border-black px-2 py-0.5 animate-pulse">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  AI Membaca Tulisan Nota...
-                </span>
-              )}
-            </div>
+        <form onSubmit={handleSubmit} className="p-3.5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+          {/* TAB 1: CHATBOT AI INPUT */}
+          {inputMode === 'chatbot' && (
+            <div className="p-4 bg-[#00F0FF]/15 border-3 border-black shadow-[3px_3px_0px_#121212] space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-black uppercase flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-[#FF4343]" />
+                  <span>Ketik / Tempel Daftar Pesanan Belanja Mentah:</span>
+                </label>
+              </div>
 
-            <div className="flex flex-col sm:flex-row items-center gap-2">
-              <label className="w-full sm:w-auto flex-1 cursor-pointer flex items-center justify-center gap-2 p-3 bg-white border-3 border-black shadow-[2px_2px_0px_#121212] hover:bg-slate-50 text-xs font-black uppercase">
-                <Camera className="h-4 w-4 stroke-[2.5]" />
-                <span>{isScanningAI ? 'AI Sedang Membaca Tulisan Nota...' : isUploading ? 'Mengunggah...' : '📸 Foto Nota / Upload Struk'}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleImageChange}
-                  disabled={isScanningAI || isUploading}
-                  className="hidden"
+              <div className="relative">
+                <textarea
+                  rows={8}
+                  value={chatPrompt}
+                  onChange={(e) => setChatPrompt(e.target.value)}
+                  placeholder="Ketik pesanan cth:\nOrder Prima Sushi:\n- Keju 3 pcs\n- B.Putih 1/2kg\n- Ayam paha 2kg"
+                  className="w-full bg-white border-3 border-black p-3 text-xs sm:text-sm font-bold text-black focus:outline-none shadow-[2px_2px_0px_#121212]"
                 />
-              </label>
+              </div>
 
-              {receiptImage && (
-                <div className="flex items-center gap-2 bg-white p-1.5 border-2 border-black w-full sm:w-auto">
-                  <img
-                    src={receiptImage}
-                    alt="Preview"
-                    className="h-9 w-9 object-cover border border-black"
-                  />
-                  <span className="text-xs font-black text-black pr-2 uppercase">
-                    ✓ Gambar Tersimpan
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReceiptImage(null);
-                      setAiScanStatus(null);
-                    }}
-                    className="p-1 border border-black bg-[#FF4343] text-white"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+              <button
+                type="button"
+                onClick={handleProcessAIChat}
+                disabled={isProcessingAI || !chatPrompt.trim()}
+                className="w-full py-3 bg-[#00F0FF] hover:bg-[#00d6e6] text-black font-black text-xs sm:text-sm uppercase border-3 border-black shadow-[3px_3px_0px_#121212] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isProcessingAI ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>AI Sedang Menghitung Estimasi Harga...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 stroke-[2.5]" />
+                    <span>Hitung Estimasi Harga & Masukkan ke Tabel</span>
+                  </>
+                )}
+              </button>
+
+              {aiSummaryMsg && (
+                <div className="p-3 bg-white border-2 border-black text-xs font-black text-black space-y-1">
+                  <div className="flex items-center gap-1.5 text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>{aiSummaryMsg}</span>
+                  </div>
+                  <p className="text-[11px] font-bold text-black/70">
+                    *Rincian barang & estimasi harga sudah masuk ke tabel di bawah. Anda bisa menyesuaikan harga real jika diperlukan.
+                  </p>
                 </div>
               )}
             </div>
+          )}
 
-            {/* AI Status Message */}
-            {aiScanStatus && (
-              <div className={`p-2 border-2 border-black text-xs font-bold ${
-                aiScanStatus.startsWith('✓') ? 'bg-[#00F0FF] text-black' : 'bg-[#FFE600] text-black'
-              }`}>
-                {aiScanStatus}
-              </div>
-            )}
-          </div>
-
-          {/* Outlet & Tanggal */}
+          {/* TAB 2 & CORE: FORM PENGATURAN TARGET & PEMBAYARAN */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-black text-black uppercase mb-1">
@@ -400,37 +380,42 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
           </div>
 
           {/* Supplier Info */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 bg-white border-3 border-black shadow-[3px_3px_0px_#121212]">
+          <div className="p-3 bg-white border-3 border-black shadow-[3px_3px_0px_#121212] grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
               <label className="block text-[11px] font-black text-black uppercase mb-1">
-                Pilih Dari Master Supplier
+                Nama Toko / Tempat Belanja <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={supplierName}
+                onChange={(e) => setSupplierName(e.target.value)}
+                placeholder="Contoh: Pasar Tradisional / Yanto Sayur"
+                className="w-full bg-[#FFFDF5] border-2 border-black p-1.5 text-xs font-bold text-black focus:outline-none"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black text-black uppercase mb-1">
+                Pilih Dari Master Supplier (Opsional)
               </label>
               <select
                 value={supplierId}
-                onChange={handleSupplierSelect}
+                onChange={(e) => {
+                  const sId = e.target.value;
+                  setSupplierId(sId);
+                  const sup = suppliers.find(s => s.id === sId);
+                  if (sup) setSupplierName(sup.name);
+                }}
                 className="w-full bg-[#FFFDF5] border-2 border-black p-1.5 text-xs font-bold text-black focus:outline-none"
               >
-                <option value="">-- Ketik Manual / Pilih Supplier --</option>
+                <option value="">-- Supplier Umum / Pasar --</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} ({s.payment_terms === 'tempo' ? `Tempo ${s.default_tempo_days} hari` : 'Cash'})
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-black text-black uppercase mb-1">
-                Nama Toko / Supplier <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="text"
-                value={supplierName}
-                onChange={(e) => setSupplierName(e.target.value)}
-                placeholder="Contoh: Toko Sumber Pangan / Yanto Sayur"
-                className="w-full bg-[#FFFDF5] border-2 border-black p-1.5 text-xs font-bold text-black focus:outline-none"
-                required
-              />
             </div>
           </div>
 
@@ -510,7 +495,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                   </button>
                 </div>
 
-                {/* Sub-selector batch */}
                 {paymentSource === 'advance_transfer' && (
                   <div className="p-3 bg-[#00F0FF]/15 border-2 border-black space-y-2">
                     <div className="flex items-center justify-between">
@@ -628,11 +612,11 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             )}
           </div>
 
-          {/* Detail Item Barang with Datalist Autocomplete from Excel */}
+          {/* Detail Item Barang */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-black uppercase">
-                Daftar Barang Belanjaan (Autocomplete 297 Kamus Resep)
+                Rincian Barang & Estimasi Harga ({items.length} Item)
               </label>
               <button
                 type="button"
@@ -644,15 +628,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
               </button>
             </div>
 
-            {/* Datalist untuk Autocomplete Kamus Resep */}
-            <datalist id="catalog-ingredients">
-              {INGREDIENTS_CATALOG.map((cat, i) => (
-                <option key={i} value={cat.name}>
-                  {cat.outlet} - {cat.category} (Est. Rp{cat.price.toLocaleString('id-ID')})
-                </option>
-              ))}
-            </datalist>
-
             <div className="space-y-2">
               {items.map((item, index) => (
                 <div
@@ -662,8 +637,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                   <div className="col-span-12 sm:col-span-5">
                     <input
                       type="text"
-                      list="catalog-ingredients"
-                      placeholder="Nama barang (cth: Susu UHT, Paha Fillet)"
+                      placeholder="Nama barang (cth: Keju Prochiz, B.Putih)"
                       value={item.item_name}
                       onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
                       className="w-full bg-[#FFFDF5] border-2 border-black p-1.5 text-xs font-bold text-black focus:outline-none"
@@ -685,29 +659,19 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                   </div>
 
                   <div className="col-span-3 sm:col-span-2">
-                    <select
+                    <input
+                      type="text"
+                      placeholder="Satuan"
                       value={item.unit}
                       onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
-                      className="w-full bg-[#FFFDF5] border-2 border-black p-1.5 text-xs font-bold text-black focus:outline-none"
-                    >
-                      <option value="pcs">pcs</option>
-                      <option value="kg">kg</option>
-                      <option value="gram">gram</option>
-                      <option value="gr">gr</option>
-                      <option value="liter">liter</option>
-                      <option value="l">l</option>
-                      <option value="can">can</option>
-                      <option value="karton">karton</option>
-                      <option value="pack">pack</option>
-                      <option value="botol">botol</option>
-                      <option value="pouch">pouch</option>
-                    </select>
+                      className="w-full bg-[#FFFDF5] border-2 border-black p-1.5 text-xs font-bold text-black text-center focus:outline-none"
+                    />
                   </div>
 
                   <div className="col-span-4 sm:col-span-2">
                     <input
                       type="number"
-                      placeholder="Harga"
+                      placeholder="Estimasi Harga"
                       value={item.unit_price || ''}
                       onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
                       className="w-full bg-[#FFFDF5] border-2 border-black p-1.5 text-xs font-black text-black text-right focus:outline-none"
@@ -728,27 +692,32 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
               ))}
             </div>
 
-            {/* Total Nota */}
-            <div className="flex justify-between items-center p-3 sm:p-4 bg-[#FFE600] border-3 sm:border-4 border-black shadow-[3px_3px_0px_#121212]">
-              <span className="text-xs font-black text-black uppercase tracking-wider">
-                Total Belanja Nota:
-              </span>
-              <span className="text-base sm:text-xl font-black text-black">
+            {/* Total Estimasi Belanja */}
+            <div className="flex justify-between items-center p-3.5 sm:p-4 bg-[#FFE600] border-3 sm:border-4 border-black shadow-[3px_3px_0px_#121212]">
+              <div>
+                <span className="text-xs font-black text-black uppercase tracking-wider block">
+                  Total Estimasi Belanja:
+                </span>
+                <span className="text-[10px] font-bold text-black/70">
+                  Dihitung otomatis dari 297 katalog resep
+                </span>
+              </div>
+              <span className="text-lg sm:text-2xl font-black text-black">
                 {formatRupiah(totalCalculated)}
               </span>
             </div>
           </div>
 
-          {/* Catatan */}
+          {/* Catatan Tambahan */}
           <div>
             <label className="block text-xs font-black text-black uppercase mb-1">
-              Catatan
+              Catatan Belanja
             </label>
             <input
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Contoh: Belanja pasar sayur & daging ayam"
+              placeholder="Contoh: Belanja pasar pagi sayur & bumbu"
               className="w-full bg-white border-2 border-black p-2 text-xs font-bold text-black focus:outline-none"
             />
           </div>
@@ -764,10 +733,9 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isUploading || isScanningAI}
-              className="px-5 py-2 border-3 border-black bg-[#00F0FF] text-black text-xs font-black uppercase shadow-[3px_3px_0px_#121212] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all disabled:opacity-50"
+              className="px-6 py-2.5 border-3 border-black bg-[#00F0FF] text-black text-xs sm:text-sm font-black uppercase shadow-[3px_3px_0px_#121212] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all"
             >
-              {initialData ? 'Simpan Perubahan' : 'Simpan Belanja'}
+              {initialData ? 'Simpan Perubahan' : 'Simpan Transaksi Belanja'}
             </button>
           </div>
         </form>
