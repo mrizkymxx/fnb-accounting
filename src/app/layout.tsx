@@ -2,12 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FnB AccountIQ - Purchasing & Cash Flow",
+  title: "FnB AccountIQ",
   description: "Manajemen purchasing, kas dipegang, tempo supplier, dan dana belanja FnB",
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "FnB AccountIQ",
+    title: "AccountIQ",
   },
 };
 
@@ -27,6 +28,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id" className="h-full">
+      <head>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="AccountIQ" />
+      </head>
       <body className="min-h-full flex flex-col antialiased text-black">
         {children}
       </body>

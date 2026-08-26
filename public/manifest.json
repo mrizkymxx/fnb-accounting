@@ -1,0 +1,21 @@
+{
+  "name": "FnB AccountIQ",
+  "short_name": "AccountIQ",
+  "description": "Sistem Operasional Purchasing & Arus Kas FnB",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FCFAF2",
+  "theme_color": "#FFE600",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
