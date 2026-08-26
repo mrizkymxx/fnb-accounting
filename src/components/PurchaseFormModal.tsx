@@ -9,15 +9,9 @@ import {
   Plus,
   Trash2,
   AlertCircle,
-  Sparkles,
-  Loader2,
-  Bot,
-  Send,
-  CheckCircle2,
   Calculator,
   ArrowRight
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 
 interface PurchaseFormModalProps {
   isOpen: boolean;
@@ -31,25 +25,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   onClose,
 }) => {
   const { outlets, suppliers, advanceBatches, addPurchase, updatePurchase, selectedOutletId } = useApp();
-
-  const [inputMode, setInputMode] = useState<'chatbot' | 'manual'>('chatbot');
-  const [chatPrompt, setChatPrompt] = useState<string>(
-`Order Prima Sushi :
-- Keju Prochiz Gold 3px
-- B.Putih 1/2kg
-- Kentang 2 Biji besar / 3 Biji sedang
-- Sawi Sendok 7
-- Sabun cuci piring 2 Jrigen
-- Selada 1plastik
-- Kol putih ukuran kecil 1
-- Jeruk Nipis 6biji yang matang/ banyak airnya
-- Toge 500 gram
-- Gula 2kg
-- Udang 1/2kg
-- Ayam Paha`
-  );
-  const [isProcessingAI, setIsProcessingAI] = useState(false);
-  const [aiSummaryMsg, setAiSummaryMsg] = useState<string | null>(null);
 
   // Form states
   const [outletId, setOutletId] = useState<string>('out_oklah');
@@ -83,7 +58,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       setItems(initialData.items && initialData.items.length > 0 ? initialData.items : [
         { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
       ]);
-      setInputMode('manual');
     } else {
       setOutletId(selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || 'out_oklah'));
       setSupplierId('');
@@ -93,8 +67,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       setAdvanceBatchId('auto_fifo');
       setIsTempo(false);
       setNotes('');
-      setAiSummaryMsg(null);
-      setInputMode('chatbot');
     }
   }, [initialData, isOpen, selectedOutletId, outlets]);
 
@@ -107,73 +79,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   const totalOutletRemaining = outletAdvanceBatches
     .filter(b => b.status === 'active')
     .reduce((acc, b) => acc + b.remaining_amount, 0);
-
-  // Proses teks mentah chat via AI Gemini
-  const handleProcessAIChat = async () => {
-    if (!chatPrompt.trim()) return;
-
-    try {
-      setIsProcessingAI(true);
-      setAiSummaryMsg(null);
-
-      const currentOutletObj = outlets.find(o => o.id === outletId);
-
-      const res = await fetch('/api/parse-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          textPrompt: chatPrompt,
-          defaultOutlet: currentOutletObj?.name || 'Oklah'
-        })
-      });
-
-      const json = await res.json();
-
-      if (res.ok && json.data) {
-        const aiData = json.data;
-
-        if (aiData.detected_outlet_name) {
-          const matchedOutlet = outlets.find(
-            o => o.name.toLowerCase().includes(aiData.detected_outlet_name.toLowerCase()) ||
-                 aiData.detected_outlet_name.toLowerCase().includes(o.name.toLowerCase())
-          );
-          if (matchedOutlet) {
-            setOutletId(matchedOutlet.id);
-          }
-        }
-
-        if (aiData.supplier_suggestion) {
-          setSupplierName(aiData.supplier_suggestion);
-        }
-
-        if (Array.isArray(aiData.items) && aiData.items.length > 0) {
-          setItems(aiData.items.map((it: any, idx: number) => ({
-            id: `item_chat_${Date.now()}_${idx}`,
-            item_name: it.item_name || it.raw_text,
-            quantity: Number(it.quantity) || 1,
-            unit: it.unit || 'pcs',
-            unit_price: Number(it.estimated_unit_price) || 0,
-            subtotal: Number(it.estimated_subtotal) || ((Number(it.quantity) || 1) * (Number(it.estimated_unit_price) || 0)),
-          })));
-
-          setAiSummaryMsg(aiData.summary_message || `✓ Berhasil menghitung estimasi harga untuk ${aiData.items.length} item barang.`);
-
-          try {
-            confetti({
-              particleCount: 70,
-              spread: 60,
-              origin: { y: 0.6 }
-            });
-          } catch {}
-        }
-      }
-    } catch (err) {
-      console.error('Gagal memproses chat AI:', err);
-      alert('Gagal memproses teks dengan AI. Silakan coba lagi atau gunakan input manual.');
-    } finally {
-      setIsProcessingAI(false);
-    }
-  };
 
   const handleItemChange = (index: number, field: keyof PurchaseItem, value: any) => {
     const updated = [...items];
@@ -246,10 +151,10 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
           <div>
             <h2 className="text-base sm:text-lg font-black text-black uppercase tracking-tight flex items-center gap-2">
               <Calculator className="h-5 w-5 stroke-[2.5]" />
-              <span>{initialData ? '✏️ Edit Belanja' : '🤖 Chatbot Estimasi & Input Belanja'}</span>
+              <span>{initialData ? '✏️ Edit Belanja' : '🛒 Input Belanja'}</span>
             </h2>
             <p className="text-[11px] font-bold text-black/70">
-              Ketik atau paste daftar belanja mentah &rarr; AI otomatis hitung estimasi harga dari kamus resep
+              Isi rincian barang belanja & pembayaran secara manual
             </p>
           </div>
           <button
@@ -260,89 +165,9 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
           </button>
         </div>
 
-        {/* Mode Switcher Tabs */}
-        <div className="flex bg-white border-b-3 border-black p-1">
-          <button
-            type="button"
-            onClick={() => setInputMode('chatbot')}
-            className={`flex-1 py-2 text-xs font-black uppercase transition-all flex items-center justify-center gap-1.5 ${
-              inputMode === 'chatbot'
-                ? 'bg-[#00F0FF] text-black border-2 border-black shadow-[2px_2px_0px_#121212]'
-                : 'text-black/70 hover:text-black'
-            }`}
-          >
-            <Bot className="h-4 w-4 stroke-[2.5]" />
-            <span>Chatbot AI Estimator</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setInputMode('manual')}
-            className={`flex-1 py-2 text-xs font-black uppercase transition-all flex items-center justify-center gap-1.5 ${
-              inputMode === 'manual'
-                ? 'bg-[#FFE600] text-black border-2 border-black shadow-[2px_2px_0px_#121212]'
-                : 'text-black/70 hover:text-black'
-            }`}
-          >
-            <span>Tabel Rincian & Pembayaran</span>
-          </button>
-        </div>
-
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="p-3.5 sm:p-6 space-y-4 overflow-y-auto flex-1">
-          {/* TAB 1: CHATBOT AI INPUT */}
-          {inputMode === 'chatbot' && (
-            <div className="p-4 bg-[#00F0FF]/15 border-3 border-black shadow-[3px_3px_0px_#121212] space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-black text-black uppercase flex items-center gap-1.5">
-                  <Sparkles className="h-4 w-4 text-[#FF4343]" />
-                  <span>Ketik / Tempel Daftar Pesanan Belanja Mentah:</span>
-                </label>
-              </div>
-
-              <div className="relative">
-                <textarea
-                  rows={8}
-                  value={chatPrompt}
-                  onChange={(e) => setChatPrompt(e.target.value)}
-                  placeholder="Ketik pesanan cth:\nOrder Prima Sushi:\n- Keju 3 pcs\n- B.Putih 1/2kg\n- Ayam paha 2kg"
-                  className="w-full bg-white border-3 border-black p-3 text-xs sm:text-sm font-bold text-black focus:outline-none shadow-[2px_2px_0px_#121212]"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleProcessAIChat}
-                disabled={isProcessingAI || !chatPrompt.trim()}
-                className="w-full py-3 bg-[#00F0FF] hover:bg-[#00d6e6] text-black font-black text-xs sm:text-sm uppercase border-3 border-black shadow-[3px_3px_0px_#121212] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isProcessingAI ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>AI Sedang Menghitung Estimasi Harga...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 stroke-[2.5]" />
-                    <span>Hitung Estimasi Harga & Masukkan ke Tabel</span>
-                  </>
-                )}
-              </button>
-
-              {aiSummaryMsg && (
-                <div className="p-3 bg-white border-2 border-black text-xs font-black text-black space-y-1">
-                  <div className="flex items-center gap-1.5 text-emerald-700">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>{aiSummaryMsg}</span>
-                  </div>
-                  <p className="text-[11px] font-bold text-black/70">
-                    *Rincian barang & estimasi harga sudah masuk ke tabel di bawah. Anda bisa menyesuaikan harga real jika diperlukan.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 2 & CORE: FORM PENGATURAN TARGET & PEMBAYARAN */}
+          {/* FORM PENGATURAN TARGET & PEMBAYARAN */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-black text-black uppercase mb-1">
