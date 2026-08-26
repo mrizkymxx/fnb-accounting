@@ -6,6 +6,7 @@ import { Purchase, PurchaseItem, PaymentSource } from '@/types/database';
 import { formatRupiah } from '@/lib/formatters';
 import { uploadReceiptFile } from '@/lib/storageUtils';
 import { compressReceiptImage } from '@/lib/imageCompressor';
+import { INGREDIENTS_CATALOG } from '@/lib/ingredientsCatalog';
 import {
   X,
   Plus,
@@ -13,8 +14,7 @@ import {
   Camera,
   AlertCircle,
   Sparkles,
-  Loader2,
-  CheckCircle2
+  Loader2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -118,6 +118,20 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     const updated = [...items];
     const item = { ...updated[index], [field]: value };
 
+    // Auto-fill satuan dan estimasi harga jika nama bahan cocok dengan kamus Excel
+    if (field === 'item_name') {
+      const match = INGREDIENTS_CATALOG.find(
+        cat => cat.name.toLowerCase() === value.toString().trim().toLowerCase()
+      );
+      if (match) {
+        if (match.unit) item.unit = match.unit.toLowerCase();
+        if (match.price > 0 && !item.unit_price) {
+          item.unit_price = match.price;
+          item.subtotal = (item.quantity || 1) * match.price;
+        }
+      }
+    }
+
     if (field === 'quantity' || field === 'unit_price') {
       const q = field === 'quantity' ? Number(value) : item.quantity;
       const p = field === 'unit_price' ? Number(value) : item.unit_price;
@@ -142,7 +156,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
   const totalCalculated = items.reduce((acc, curr) => acc + (curr.subtotal || 0), 0);
 
-  // Kompresi + Upload ke Cloud Supabase Storage + AI Scan OCR otomatis
+  // Kompresi + Upload ke Cloud Supabase Storage + AI Scan OCR otomatis (Groq Vision)
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -150,7 +164,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     try {
       setIsUploading(true);
       setIsScanningAI(true);
-      setAiScanStatus('Sedang mengompres & menganalisis struk...');
+      setAiScanStatus('Sedang membaca tulisan nota dengan AI Groq Vision...');
 
       // 1. Dapatkan base64 terkompresi
       const compressedBase64 = await compressReceiptImage(file, 1200, 0.72);
@@ -201,7 +215,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
         }
 
         if (filledCount > 0) {
-          setAiScanStatus(`✓ AI Berhasil membaca ${aiData.items?.length || 0} item & mengisi form otomatis!`);
+          setAiScanStatus(`✓ Berhasil mencocokkan & mengisi ${aiData.items?.length || 0} barang dari kamus resep!`);
           try {
             confetti({
               particleCount: 60,
@@ -210,10 +224,10 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             });
           } catch {}
         } else {
-          setAiScanStatus('⚠️ Gambar terupload, namun AI tidak menemukan teks rincian belanjaan. Anda bisa isi form manual.');
+          setAiScanStatus('⚠️ Foto tersimpan. Tulisan nota tidak terbaca jelas, silakan lengkapi item di bawah.');
         }
       } else {
-        setAiScanStatus('⚠️ Gambar terupload. AI tidak mendeteksi teks struk/nota.');
+        setAiScanStatus('⚠️ Foto tersimpan. AI tidak mendeteksi tulisan struk.');
       }
     } catch (err) {
       console.error('Gagal scan nota AI:', err);
@@ -268,11 +282,11 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             <h2 className="text-base sm:text-lg font-black text-black uppercase tracking-tight flex items-center gap-1.5">
               <span>{initialData ? '✏️ Edit Belanja' : '🧾 Catat Belanja & Scan Nota'}</span>
               <span className="text-[10px] bg-[#00F0FF] text-black border border-black px-1.5 py-0.2 rounded font-black uppercase">
-                AI Groq
+                AI Groq Vision
               </span>
             </h2>
             <p className="text-[11px] font-bold text-black/70">
-              Foto nota struk &rarr; AI otomatis mengisi nama toko, barang, qty, dan harga
+              Mendukung nota tulisan tangan pasar &bull; Otomatis dicocokkan ke 297 kamus bahan Oklah & Prima
             </p>
           </div>
           <button
@@ -290,12 +304,12 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-black uppercase flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4 text-[#FF4343]" />
-                <span>Foto Nota Fisik & Auto-Scan AI (Groq Vision)</span>
+                <span>Foto Nota / Struk Pasar (Auto-Scan AI)</span>
               </label>
               {isScanningAI && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase bg-[#FFE600] border border-black px-2 py-0.5 animate-pulse">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Menganalisis Struk...
+                  AI Membaca Tulisan Nota...
                 </span>
               )}
             </div>
@@ -303,7 +317,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             <div className="flex flex-col sm:flex-row items-center gap-2">
               <label className="w-full sm:w-auto flex-1 cursor-pointer flex items-center justify-center gap-2 p-3 bg-white border-3 border-black shadow-[2px_2px_0px_#121212] hover:bg-slate-50 text-xs font-black uppercase">
                 <Camera className="h-4 w-4 stroke-[2.5]" />
-                <span>{isScanningAI ? 'AI Sedang Membaca Struk...' : isUploading ? 'Mengunggah...' : '📸 Foto Nota / Upload Struk'}</span>
+                <span>{isScanningAI ? 'AI Sedang Membaca Tulisan Nota...' : isUploading ? 'Mengunggah...' : '📸 Foto Nota / Upload Struk'}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -413,7 +427,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                 type="text"
                 value={supplierName}
                 onChange={(e) => setSupplierName(e.target.value)}
-                placeholder="Contoh: Toko Sumber Pangan"
+                placeholder="Contoh: Toko Sumber Pangan / Yanto Sayur"
                 className="w-full bg-[#FFFDF5] border-2 border-black p-1.5 text-xs font-bold text-black focus:outline-none"
                 required
               />
@@ -496,6 +510,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                   </button>
                 </div>
 
+                {/* Sub-selector batch */}
                 {paymentSource === 'advance_transfer' && (
                   <div className="p-3 bg-[#00F0FF]/15 border-2 border-black space-y-2">
                     <div className="flex items-center justify-between">
@@ -613,11 +628,11 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             )}
           </div>
 
-          {/* Detail Item Barang */}
+          {/* Detail Item Barang with Datalist Autocomplete from Excel */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-black uppercase">
-                Daftar Barang Belanjaan (Hasil Scan / Manual)
+                Daftar Barang Belanjaan (Autocomplete 297 Kamus Resep)
               </label>
               <button
                 type="button"
@@ -629,6 +644,15 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
               </button>
             </div>
 
+            {/* Datalist untuk Autocomplete Kamus Resep */}
+            <datalist id="catalog-ingredients">
+              {INGREDIENTS_CATALOG.map((cat, i) => (
+                <option key={i} value={cat.name}>
+                  {cat.outlet} - {cat.category} (Est. Rp{cat.price.toLocaleString('id-ID')})
+                </option>
+              ))}
+            </datalist>
+
             <div className="space-y-2">
               {items.map((item, index) => (
                 <div
@@ -638,7 +662,8 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                   <div className="col-span-12 sm:col-span-5">
                     <input
                       type="text"
-                      placeholder="Nama barang (cth: Susu UHT)"
+                      list="catalog-ingredients"
+                      placeholder="Nama barang (cth: Susu UHT, Paha Fillet)"
                       value={item.item_name}
                       onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
                       className="w-full bg-[#FFFDF5] border-2 border-black p-1.5 text-xs font-bold text-black focus:outline-none"
@@ -668,10 +693,14 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                       <option value="pcs">pcs</option>
                       <option value="kg">kg</option>
                       <option value="gram">gram</option>
+                      <option value="gr">gr</option>
                       <option value="liter">liter</option>
+                      <option value="l">l</option>
+                      <option value="can">can</option>
                       <option value="karton">karton</option>
                       <option value="pack">pack</option>
                       <option value="botol">botol</option>
+                      <option value="pouch">pouch</option>
                     </select>
                   </div>
 
@@ -719,7 +748,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Contoh: Belanja barengan Oklah & Prima nota dipisah"
+              placeholder="Contoh: Belanja pasar sayur & daging ayam"
               className="w-full bg-white border-2 border-black p-2 text-xs font-bold text-black focus:outline-none"
             />
           </div>

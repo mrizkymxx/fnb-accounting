@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { INGREDIENTS_CATALOG } from '@/lib/ingredientsCatalog';
 
 export async function POST(request: Request) {
   try {
@@ -10,41 +11,46 @@ export async function POST(request: Request) {
 
     const apiKey = process.env.GROQ_API_KEY || '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';
 
-    // Format clean base64 data URL
     const cleanBase64 = imageBase64.startsWith('data:')
       ? imageBase64
       : `data:image/jpeg;base64,${imageBase64}`;
 
-    // Gunakan Llama 3.2 Vision via Groq API (super cepat ~1 detik)
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.2-11b-vision-preview',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Anda adalah AI OCR Akuntansi untuk restoran/kafe. Analisis gambar nota/struk belanja ini dan ekstrak informasinya dalam format JSON murni.
-Aturan:
-1. "supplier_name": Nama toko/supplier di nota (jika tidak jelas, isi "Toko/Supplier").
-2. "purchase_date": Tanggal transaksi format YYYY-MM-DD (jika tidak ada, gunakan tanggal hari ini).
-3. "items": Array barang belanjaan dengan format:
-   - "item_name": nama barang spesifik
-   - "quantity": angka jumlah (cth: 1, 2.5)
-   - "unit": satuan seperti "pcs", "kg", "pack", "karton", "botol", "liter", "gram"
+    // Sample list bahan baku resmi untuk referensi AI
+    const referenceList = INGREDIENTS_CATALOG.map(i => `${i.name} (satuan: ${i.unit}, est. Rp${i.price})`).slice(0, 150).join(', ');
+
+    const promptText = `Anda adalah AI OCR Akuntansi khusus restoran & kafe (Oklah & Prima Sushi).
+Tugas Anda: Baca foto struk/nota belanja (termasuk NOTA TULISAN TANGAN PASAR/SUPPLIER).
+
+DAFTAR NAMA BAHAN ACUAN KAMUS (Jika tulisan tangan mirip salah satu bahan di bawah, normalisasikan ke nama resmi ini):
+[${referenceList}]
+
+Contoh Pencocokan Tulisan Tangan Pasar:
+- "susu eva" / "evaporasi" -> "Susu Evaporasi"
+- "uht" / "diamond" / "ultra milk" -> "UHT Full Cream"
+- "condens" / "susu kental" -> "Condense Milk"
+- "paha" / "fillet" -> "PAHA FILLET"
+- "salmon" / "ekor salmon" -> "Salmon Fresh"
+- "tuna" / "loin" -> "Tuna Loin"
+- "nori" / "rumput laut" -> "Nori"
+- "beras sushi" / "sakura" -> "Beras Sushi"
+- "mayo" / "kens" / "kewpie" -> "Mayo Kens"
+- "cabe bubuk" / "togarasi" -> "Togarasi"
+- "wasabi" -> "Wasabi"
+- "telur" / "ayam dada" / "sayuran" -> sesuaikan dengan barang asli.
+
+Ekstrak informasinya dalam format JSON murni:
+1. "supplier_name": Nama toko/supplier di nota (jika tidak tertulis, tebak cth: "Pasar Segar / Supplier").
+2. "purchase_date": Tanggal transaksi format YYYY-MM-DD.
+3. "items": Array barang belanjaan:
+   - "item_name": nama barang hasil pencocokan kamus
+   - "quantity": angka jumlah
+   - "unit": satuan kemasan ("kg", "pcs", "pack", "karton", "botol", "liter", "can", "gr")
    - "unit_price": harga satuan angka
    - "subtotal": total per item
 4. "total_amount": total akhir nota angka.
-5. "notes": catatan ringkas jika ada info tambahan.
+5. "notes": catatan singkat jika ada info tambahan.
 
-Balas HANYA JSON valid tanpa markdown, tanpa teks pembuka/penutup.
-Format JSON yang diharapkan:
+Balas HANYA JSON valid tanpa pembuka/penutup markdown:
 {
   "supplier_name": "string",
   "purchase_date": "YYYY-MM-DD",
@@ -59,7 +65,23 @@ Format JSON yang diharapkan:
   ],
   "total_amount": 0,
   "notes": "string"
-}`
+}`;
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.2-11b-vision-preview',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: promptText
               },
               {
                 type: 'image_url',
@@ -71,7 +93,7 @@ Format JSON yang diharapkan:
           }
         ],
         temperature: 0.1,
-        max_tokens: 1024,
+        max_tokens: 1500,
         response_format: { type: 'json_object' }
       })
     });
