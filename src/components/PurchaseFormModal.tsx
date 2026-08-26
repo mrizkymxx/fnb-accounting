@@ -4,14 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Purchase, PurchaseItem, PaymentSource } from '@/types/database';
 import { formatRupiah } from '@/lib/formatters';
-import { compressReceiptImage } from '@/lib/imageCompressor';
+import { uploadReceiptFile } from '@/lib/storageUtils';
 import {
   X,
   Plus,
   Trash2,
   Camera,
-  AlertCircle,
-  Sparkles
+  AlertCircle
 } from 'lucide-react';
 
 interface PurchaseFormModalProps {
@@ -40,7 +39,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   );
   const [notes, setNotes] = useState<string>('');
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
-  const [isCompressing, setIsCompressing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const [items, setItems] = useState<PurchaseItem[]>([
     { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
@@ -134,19 +133,19 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
   const totalCalculated = items.reduce((acc, curr) => acc + (curr.subtotal || 0), 0);
 
-  // Kompresi foto nota otomatis (kamera iPhone 8MB -> 100KB ultra tajam)
+  // Kompresi + Upload ke Cloud Supabase Storage Bucket 'receipts'
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      setIsCompressing(true);
-      const compressedBase64 = await compressReceiptImage(file, 1200, 0.72);
-      setReceiptImage(compressedBase64);
+      setIsUploading(true);
+      const uploadedUrl = await uploadReceiptFile(file, 'purchases');
+      setReceiptImage(uploadedUrl);
     } catch (err) {
-      console.error('Gagal kompres gambar:', err);
+      console.error('Gagal upload nota:', err);
     } finally {
-      setIsCompressing(false);
+      setIsUploading(false);
     }
   };
 
@@ -357,12 +356,12 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                   </button>
                 </div>
 
-                {/* Sub-selector batch transfer luar & Kumpulan Sisa */}
+                {/* Sub-selector batch */}
                 {paymentSource === 'advance_transfer' && (
                   <div className="p-3 bg-[#00F0FF]/15 border-2 border-black space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-black text-black uppercase">
-                        Metode Pemotongan Saldo:
+                        Pilih Batch Dana Transfer Luar Yang Dipotong:
                       </label>
                       <span className="text-[10px] font-black bg-white border border-black px-1.5 py-0.2">
                         Total Kumpulan Sisa: {formatRupiah(totalOutletRemaining)}
@@ -392,7 +391,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                               <span className="text-[9px] bg-black text-white px-1 py-0.2 uppercase">FIFO</span>
                             </span>
                             <span className="text-[10px] font-bold text-black/70 block">
-                              Otomatis menghabiskan sisa batch terlama dulu sampai cukup
+                              Otomatis memotong saldo batch terlama dulu
                             </span>
                           </div>
                         </div>
@@ -404,13 +403,13 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                       {outletAdvanceBatches.map((b) => (
                         <label
                           key={b.id}
-                          className={`p-2 border-2 border-black cursor-pointer flex items-center justify-between gap-2 transition-all ${
+                          className={`p-2 border-2 border-black cursor-pointer flex items-center justify-between gap-2 ${
                             advanceBatchId === b.id
                               ? 'bg-[#00F0FF] shadow-[2px_2px_0px_#121212]'
                               : 'bg-white'
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
                             <input
                               type="radio"
                               name="advance_batch"
@@ -420,7 +419,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                               className="accent-black"
                             />
                             <div className="truncate">
-                              <span className="text-xs font-bold text-black block truncate">{b.batch_name}</span>
+                              <span className="text-xs font-black text-black block truncate">{b.batch_name}</span>
                               <span className="text-[10px] text-black/70">Dari: {b.sender_source}</span>
                             </div>
                           </div>
@@ -572,21 +571,21 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             </div>
           </div>
 
-          {/* Upload Foto Nota (Auto-Compressed) */}
+          {/* Upload Foto Nota */}
           <div className="space-y-1.5">
             <label className="block text-xs font-black text-black uppercase">
-              Foto Bukti Nota Fisik (Otomatis Dikompres Ringan & Tajam)
+              Foto Nota Fisik (Tersimpan di Cloud Supabase Storage)
             </label>
             <div className="flex flex-col sm:flex-row items-center gap-2">
               <label className="w-full sm:w-auto flex-1 cursor-pointer flex items-center justify-center gap-2 p-2.5 sm:p-3 bg-white border-3 border-black shadow-[2px_2px_0px_#121212] text-xs font-black uppercase">
                 <Camera className="h-4 w-4 stroke-[2.5]" />
-                <span>{isCompressing ? 'Mengompres Foto...' : 'Foto / Upload Struk'}</span>
+                <span>{isUploading ? 'Mengunggah ke Cloud Storage...' : 'Foto / Unggah Struk'}</span>
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
                   onChange={handleImageChange}
-                  disabled={isCompressing}
+                  disabled={isUploading}
                   className="hidden"
                 />
               </label>
@@ -599,7 +598,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                     className="h-9 w-9 object-cover border border-black"
                   />
                   <span className="text-xs font-black text-black pr-2 uppercase">
-                    ✓ Tersimpan
+                    ✓ Cloud Tersimpan
                   </span>
                   <button
                     type="button"
@@ -638,7 +637,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isCompressing}
+              disabled={isUploading}
               className="px-5 py-2 border-3 border-black bg-[#00F0FF] text-black text-xs font-black uppercase shadow-[3px_3px_0px_#121212] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all disabled:opacity-50"
             >
               {initialData ? 'Simpan Perubahan' : 'Simpan Belanja'}
