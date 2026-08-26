@@ -67,18 +67,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ))}
               </select>
 
-              {/* Estimator Tool Shortcut */}
-              <button
-                onClick={() => setActiveTab('ai_estimator')}
-                className={`p-1.5 border-2 border-black shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px] transition-all flex items-center gap-1 ${
-                  activeTab === 'ai_estimator' ? 'bg-black text-white' : 'bg-[#00F0FF] text-black'
-                }`}
-                title="Kalkulator Estimasi WhatsApp"
-              >
-                <Calculator className="h-4 w-4 stroke-[2.5]" />
-                <span className="hidden sm:inline text-xs font-black uppercase">Estimator</span>
-              </button>
-
               {/* Manage Outlets Button */}
               <button
                 onClick={onOpenManageOutlets}
