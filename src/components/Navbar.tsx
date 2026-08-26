@@ -2,11 +2,11 @@
 
 import React from 'react';
 import { useApp } from '@/context/AppContext';
-import { Store, Wallet, AlertCircle, ShoppingBag, PlusCircle, Building2, CreditCard, FileText, Settings } from 'lucide-react';
+import { Store, Wallet, AlertCircle, ShoppingBag, PlusCircle, Building2, CreditCard, FileText, Settings, Calculator } from 'lucide-react';
 
 interface NavbarProps {
-  activeTab: 'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers' | 'audit_reports';
-  setActiveTab: (tab: 'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers' | 'audit_reports') => void;
+  activeTab: 'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers' | 'audit_reports' | 'ai_estimator';
+  setActiveTab: (tab: 'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers' | 'audit_reports' | 'ai_estimator') => void;
   onOpenNewPurchase: () => void;
   onOpenCollectCash: () => void;
   onOpenNewAdvance: () => void;
@@ -34,7 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      {/* Top Header */}
+      {/* Top Header - Neo-Brutalism Bold */}
       <header className="sticky top-0 z-40 bg-[#FFE600] border-b-3 border-black text-black shadow-[0_3px_0px_#121212] pt-[env(safe-area-inset-top,0px)]">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14 sm:h-16">
@@ -66,6 +66,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <option key={o.id} value={o.id}>{o.name}</option>
                 ))}
               </select>
+
+              {/* Estimator Tool Shortcut */}
+              <button
+                onClick={() => setActiveTab('ai_estimator')}
+                className={`p-1.5 border-2 border-black shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px] transition-all flex items-center gap-1 ${
+                  activeTab === 'ai_estimator' ? 'bg-black text-white' : 'bg-[#00F0FF] text-black'
+                }`}
+                title="Kalkulator Estimasi WhatsApp"
+              >
+                <Calculator className="h-4 w-4 stroke-[2.5]" />
+                <span className="hidden sm:inline text-xs font-black uppercase">Estimator</span>
+              </button>
 
               {/* Manage Outlets Button */}
               <button
@@ -105,6 +117,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <ShoppingBag className="h-3.5 w-3.5 stroke-[2.5]" />
               Purchasing & Nota
+            </button>
+            <button
+              onClick={() => setActiveTab('ai_estimator')}
+              className={`px-3 py-1.5 border-2 border-black transition-all flex items-center gap-1.5 ${
+                activeTab === 'ai_estimator' ? 'bg-black text-white shadow-[2px_2px_0px_#121212]' : 'bg-[#00F0FF] text-black hover:bg-[#00d6e6]'
+              }`}
+            >
+              <Calculator className="h-3.5 w-3.5 stroke-[2.5]" />
+              <span>Estimasi WhatsApp (Stand-alone)</span>
             </button>
             <button
               onClick={() => setActiveTab('advance_funds')}
@@ -155,7 +176,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <FileText className="h-3.5 w-3.5 stroke-[2.5]" />
-              <span>Ekstrak Audit Laporan</span>
+              <span>Ekstrak Audit</span>
             </button>
             <button
               onClick={() => setActiveTab('suppliers')}
@@ -172,7 +193,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#FFE600] border-t-3 border-black shadow-[0_-3px_0px_#121212] px-1 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        <div className="grid grid-cols-6 gap-0.5 text-[8.5px] font-black uppercase text-center">
+        <div className="grid grid-cols-6 gap-0.5 text-[8px] font-black uppercase text-center">
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`py-1.5 px-0.5 border-2 border-black flex flex-col items-center justify-center transition-all ${
@@ -181,6 +202,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <span className="text-xs">📊</span>
             <span className="truncate w-full">Ringkas</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('ai_estimator')}
+            className={`py-1.5 px-0.5 border-2 border-black flex flex-col items-center justify-center transition-all ${
+              activeTab === 'ai_estimator' ? 'bg-black text-white shadow-[1px_1px_0px_#121212]' : 'bg-[#00F0FF] text-black font-black'
+            }`}
+          >
+            <Calculator className="h-3.5 w-3.5 stroke-[2.5]" />
+            <span className="truncate w-full">Estimasi</span>
           </button>
 
           <button
@@ -221,16 +252,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <AlertCircle className="h-3.5 w-3.5 stroke-[2.5]" />
             <span className="truncate w-full">Tempo</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('audit_reports')}
-            className={`py-1.5 px-0.5 border-2 border-black flex flex-col items-center justify-center relative transition-all ${
-              activeTab === 'audit_reports' ? 'bg-black text-white shadow-[1px_1px_0px_#121212]' : 'bg-white text-black'
-            }`}
-          >
-            <FileText className="h-3.5 w-3.5 stroke-[2.5]" />
-            <span className="truncate w-full">Audit</span>
           </button>
         </div>
       </nav>

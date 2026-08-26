@@ -11,6 +11,7 @@ import { CashTrackerView } from '@/components/CashTrackerView';
 import { TempoManagerView } from '@/components/TempoManagerView';
 import { SuppliersView } from '@/components/SuppliersView';
 import { AuditReportView } from '@/components/AuditReportView';
+import { AIEstimatorView } from '@/components/AIEstimatorView';
 import { PurchaseFormModal } from '@/components/PurchaseFormModal';
 import { AdvanceFundModal } from '@/components/AdvanceFundModal';
 import { CashCollectionModal } from '@/components/CashCollectionModal';
@@ -21,7 +22,7 @@ import { LoginScreen } from '@/components/LoginScreen';
 
 function MainApp() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers' | 'audit_reports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers' | 'audit_reports' | 'ai_estimator'>('dashboard');
 
   useEffect(() => {
     const session = localStorage.getItem('fnb_auth_session');
@@ -120,6 +121,10 @@ function MainApp() {
             onGoToTempo={() => setActiveTab('tempo')}
             onGoToAdvance={() => setActiveTab('advance_funds')}
           />
+        )}
+
+        {activeTab === 'ai_estimator' && (
+          <AIEstimatorView />
         )}
 
         {activeTab === 'purchases' && (
