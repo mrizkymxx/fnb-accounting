@@ -51,16 +51,17 @@ interface AppContextType {
   unpaidTempoTotal: number;
   todayExpenseTotal: number;
   isCloudSyncActive: boolean;
+  refreshCloudData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  OUTLETS: 'fnb_acc_outlets',
-  SUPPLIERS: 'fnb_acc_suppliers',
-  PURCHASES: 'fnb_acc_purchases',
-  COLLECTIONS: 'fnb_acc_collections',
-  ADVANCE_BATCHES: 'fnb_acc_advance_batches',
+  OUTLETS: 'fnb_acc_outlets_v2',
+  SUPPLIERS: 'fnb_acc_suppliers_v2',
+  PURCHASES: 'fnb_acc_purchases_v2',
+  COLLECTIONS: 'fnb_acc_collections_v2',
+  ADVANCE_BATCHES: 'fnb_acc_advance_batches_v2',
 };
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -73,60 +74,57 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isCloudSyncActive, setIsCloudSyncActive] = useState(false);
 
-  // Initial Load from Supabase Cloud First, Fallback to LocalStorage
-  useEffect(() => {
-    async function loadData() {
-      const client = supabase;
-      if (isSupabaseConfigured && client) {
-        try {
-          const [outletsRes, suppliersRes, batchesRes, purchasesRes, collectionsRes] = await Promise.all([
-            client.from('outlets').select('*'),
-            client.from('suppliers').select('*'),
-            client.from('advance_fund_batches').select('*'),
-            client.from('purchases').select('*, items:purchase_items(*)').order('purchase_date', { ascending: false }),
-            client.from('cash_collections').select('*').order('collected_at', { ascending: false }),
-          ]);
-
-          if (outletsRes.data && outletsRes.data.length > 0) {
-            setOutlets(outletsRes.data as Outlet[]);
-            setSuppliers((suppliersRes.data as Supplier[]) || []);
-            setAdvanceBatches((batchesRes.data as AdvanceFundBatch[]) || []);
-            setPurchases((purchasesRes.data as Purchase[]) || []);
-            setCollections((collectionsRes.data as CashCollection[]) || []);
-            setIsCloudSyncActive(true);
-            setIsLoaded(true);
-            return;
-          }
-        } catch (err) {
-          console.warn('Cloud sync offline or error, falling back to LocalStorage', err);
-        }
-      }
-
-      // Fallback LocalStorage
+  // Sync / Load Function
+  const fetchCloudData = async () => {
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
       try {
-        const storedOutlets = localStorage.getItem(STORAGE_KEYS.OUTLETS);
-        const storedSuppliers = localStorage.getItem(STORAGE_KEYS.SUPPLIERS);
-        const storedPurchases = localStorage.getItem(STORAGE_KEYS.PURCHASES);
-        const storedCollections = localStorage.getItem(STORAGE_KEYS.COLLECTIONS);
-        const storedBatches = localStorage.getItem(STORAGE_KEYS.ADVANCE_BATCHES);
+        const [outletsRes, suppliersRes, batchesRes, purchasesRes, collectionsRes] = await Promise.all([
+          client.from('outlets').select('*').order('name'),
+          client.from('suppliers').select('*').order('name'),
+          client.from('advance_fund_batches').select('*').order('received_at', { ascending: false }),
+          client.from('purchases').select('*, items:purchase_items(*)').order('purchase_date', { ascending: false }),
+          client.from('cash_collections').select('*').order('collected_at', { ascending: false }),
+        ]);
 
-        setOutlets(storedOutlets ? JSON.parse(storedOutlets) : INITIAL_OUTLETS);
-        setSuppliers(storedSuppliers ? JSON.parse(storedSuppliers) : INITIAL_SUPPLIERS);
-        setPurchases(storedPurchases ? JSON.parse(storedPurchases) : INITIAL_PURCHASES);
-        setCollections(storedCollections ? JSON.parse(storedCollections) : INITIAL_COLLECTIONS);
-        setAdvanceBatches(storedBatches ? JSON.parse(storedBatches) : INITIAL_ADVANCE_BATCHES);
-      } catch {
-        setOutlets(INITIAL_OUTLETS);
-        setSuppliers(INITIAL_SUPPLIERS);
-        setPurchases(INITIAL_PURCHASES);
-        setCollections(INITIAL_COLLECTIONS);
-        setAdvanceBatches(INITIAL_ADVANCE_BATCHES);
-      } finally {
-        setIsLoaded(true);
+        if (outletsRes.data && outletsRes.data.length > 0) {
+          setOutlets(outletsRes.data as Outlet[]);
+          setSuppliers((suppliersRes.data as Supplier[]) || []);
+          setAdvanceBatches((batchesRes.data as AdvanceFundBatch[]) || []);
+          setPurchases((purchasesRes.data as Purchase[]) || []);
+          setCollections((collectionsRes.data as CashCollection[]) || []);
+          setIsCloudSyncActive(true);
+          return;
+        }
+      } catch (err) {
+        console.warn('Cloud sync error, using local state', err);
       }
     }
 
-    loadData();
+    // Fallback Local
+    try {
+      const storedOutlets = localStorage.getItem(STORAGE_KEYS.OUTLETS);
+      const storedSuppliers = localStorage.getItem(STORAGE_KEYS.SUPPLIERS);
+      const storedPurchases = localStorage.getItem(STORAGE_KEYS.PURCHASES);
+      const storedCollections = localStorage.getItem(STORAGE_KEYS.COLLECTIONS);
+      const storedBatches = localStorage.getItem(STORAGE_KEYS.ADVANCE_BATCHES);
+
+      setOutlets(storedOutlets ? JSON.parse(storedOutlets) : INITIAL_OUTLETS);
+      setSuppliers(storedSuppliers ? JSON.parse(storedSuppliers) : INITIAL_SUPPLIERS);
+      setPurchases(storedPurchases ? JSON.parse(storedPurchases) : INITIAL_PURCHASES);
+      setCollections(storedCollections ? JSON.parse(storedCollections) : INITIAL_COLLECTIONS);
+      setAdvanceBatches(storedBatches ? JSON.parse(storedBatches) : INITIAL_ADVANCE_BATCHES);
+    } catch {
+      setOutlets(INITIAL_OUTLETS);
+      setSuppliers(INITIAL_SUPPLIERS);
+      setPurchases(INITIAL_PURCHASES);
+      setCollections(INITIAL_COLLECTIONS);
+      setAdvanceBatches(INITIAL_ADVANCE_BATCHES);
+    }
+  };
+
+  useEffect(() => {
+    fetchCloudData().finally(() => setIsLoaded(true));
   }, []);
 
   // Save to LocalStorage
@@ -635,6 +633,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         unpaidTempoTotal,
         todayExpenseTotal,
         isCloudSyncActive,
+        refreshCloudData: fetchCloudData,
       }}
     >
       {children}
