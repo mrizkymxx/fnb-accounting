@@ -15,6 +15,7 @@ import { PurchaseFormModal } from '@/components/PurchaseFormModal';
 import { AdvanceFundModal } from '@/components/AdvanceFundModal';
 import { CashCollectionModal } from '@/components/CashCollectionModal';
 import { DepositBankModal } from '@/components/DepositBankModal';
+import { OutletManagerModal } from '@/components/OutletManagerModal';
 import { ReceiptPreviewModal } from '@/components/ReceiptPreviewModal';
 import { LoginScreen } from '@/components/LoginScreen';
 
@@ -34,6 +35,7 @@ function MainApp() {
   const [editingCollection, setEditingCollection] = useState<CashCollection | null>(null);
 
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
+  const [isOutletModalOpen, setIsOutletModalOpen] = useState(false);
   const [depositModalOutletId, setDepositModalOutletId] = useState<string | null>(null);
 
   const [previewReceipt, setPreviewReceipt] = useState<{ url: string; title: string } | null>(null);
@@ -94,6 +96,7 @@ function MainApp() {
         onOpenNewPurchase={handleOpenNewPurchase}
         onOpenCollectCash={handleOpenCollectCash}
         onOpenNewAdvance={() => setIsAdvanceModalOpen(true)}
+        onOpenManageOutlets={() => setIsOutletModalOpen(true)}
       />
 
       {/* Main View Area */}
@@ -185,6 +188,11 @@ function MainApp() {
         isOpen={Boolean(depositModalOutletId)}
         outletId={depositModalOutletId || ''}
         onClose={() => setDepositModalOutletId(null)}
+      />
+
+      <OutletManagerModal
+        isOpen={isOutletModalOpen}
+        onClose={() => setIsOutletModalOpen(false)}
       />
 
       <ReceiptPreviewModal

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useApp } from '@/context/AppContext';
-import { Store, Wallet, AlertCircle, ShoppingBag, PlusCircle, Building2, CreditCard, FileText } from 'lucide-react';
+import { Store, Wallet, AlertCircle, ShoppingBag, PlusCircle, Building2, CreditCard, FileText, Settings } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: 'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers' | 'audit_reports';
@@ -10,6 +10,7 @@ interface NavbarProps {
   onOpenNewPurchase: () => void;
   onOpenCollectCash: () => void;
   onOpenNewAdvance: () => void;
+  onOpenManageOutlets: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -18,6 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNewPurchase,
   onOpenCollectCash,
   onOpenNewAdvance,
+  onOpenManageOutlets,
 }) => {
   const {
     outlets,
@@ -46,13 +48,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                   FnB ACCOUNTIQ
                 </span>
                 <span className="text-[9px] sm:text-[10px] font-bold text-black/70">
-                  Oklah • Prima Sushi
+                  {outlets.length} Outlets Terdaftar
                 </span>
               </div>
             </div>
 
             {/* Quick Actions Header */}
             <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Outlet Selector */}
               <select
                 value={selectedOutletId}
                 onChange={(e) => setSelectedOutletId(e.target.value)}
@@ -64,6 +67,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ))}
               </select>
 
+              {/* Manage Outlets Button */}
+              <button
+                onClick={onOpenManageOutlets}
+                className="p-1.5 bg-white hover:bg-slate-100 border-2 border-black shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px]"
+                title="Kelola & Tambah Outlet"
+              >
+                <Settings className="h-4 w-4 stroke-[2.5]" />
+              </button>
+
+              {/* Action Button */}
               <button
                 onClick={onOpenNewPurchase}
                 className="flex items-center gap-1 bg-[#FF4343] text-white border-2 border-black px-2.5 sm:px-3.5 py-1.5 text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all"
