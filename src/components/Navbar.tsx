@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useApp } from '@/context/AppContext';
-import { Store, Wallet, AlertCircle, ShoppingBag, PlusCircle, Building2, CreditCard, Sparkles } from 'lucide-react';
+import { Store, Wallet, AlertCircle, ShoppingBag, PlusCircle, Building2, CreditCard } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: 'dashboard' | 'purchases' | 'advance_funds' | 'cash_tracker' | 'tempo' | 'suppliers';
@@ -32,10 +32,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      {/* Top Header - Super Compact on Mobile */}
+      {/* Top Header - Clean, Integrated, Native iOS Vibe */}
       <header className="sticky top-0 z-40 bg-[#FFE600] border-b-3 border-black text-black shadow-[0_3px_0px_#121212] pt-[env(safe-area-inset-top,0px)]">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14 sm:h-16 py-1.5">
+          <div className="flex items-center justify-between h-14 sm:h-16">
             {/* Logo */}
             <div className="flex items-center space-x-2">
               <div className="h-8 w-8 sm:h-9 sm:w-9 bg-[#FF4343] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#121212]">
@@ -51,13 +51,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
 
-            {/* Quick Actions Header */}
+            {/* Top Right Quick Actions (Integrated & Clean) */}
             <div className="flex items-center gap-1.5 sm:gap-2">
               {/* Outlet Selector */}
               <select
                 value={selectedOutletId}
                 onChange={(e) => setSelectedOutletId(e.target.value)}
-                className="bg-white border-2 border-black px-2 py-1.5 text-xs font-black uppercase shadow-[2px_2px_0px_#121212] focus:outline-none max-w-[120px] sm:max-w-none truncate"
+                className="bg-white border-2 border-black px-2 py-1.5 text-xs font-black uppercase shadow-[2px_2px_0px_#121212] focus:outline-none max-w-[110px] sm:max-w-none truncate"
               >
                 <option value="all">Semua Outlet</option>
                 {outlets.map(o => (
@@ -65,10 +65,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ))}
               </select>
 
-              {/* Action Button */}
+              {/* Main Primary Action */}
               <button
                 onClick={onOpenNewPurchase}
-                className="flex items-center gap-1 bg-[#FF4343] text-white border-2 border-black px-2.5 sm:px-3.5 py-1.5 text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+                className="flex items-center gap-1 bg-[#FF4343] text-white border-2 border-black px-2.5 sm:px-3.5 py-1.5 text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all"
               >
                 <PlusCircle className="h-3.5 w-3.5 stroke-[2.5]" />
                 <span>+ Belanja</span>
@@ -150,27 +150,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </header>
 
-      {/* Floating Action Buttons for Mobile (Sangat Cepat & Mudah Diakses Jempol) */}
-      <div className="md:hidden fixed bottom-18 right-3.5 z-30 flex flex-col gap-2">
-        <button
-          onClick={onOpenNewAdvance}
-          className="h-11 px-3 bg-[#00F0FF] border-2 border-black shadow-[3px_3px_0px_#121212] flex items-center gap-1.5 text-xs font-black uppercase text-black active:translate-x-[1px] active:translate-y-[1px]"
-          title="Terima Transfer Luar"
-        >
-          <CreditCard className="h-4 w-4 stroke-[2.5]" />
-          <span>+ Dana</span>
-        </button>
-        <button
-          onClick={onOpenCollectCash}
-          className="h-11 px-3 bg-[#FFE600] border-2 border-black shadow-[3px_3px_0px_#121212] flex items-center gap-1.5 text-xs font-black uppercase text-black active:translate-x-[1px] active:translate-y-[1px]"
-          title="Tarik Kasir Outlet"
-        >
-          <Wallet className="h-4 w-4 stroke-[2.5]" />
-          <span>Tarik Kas</span>
-        </button>
-      </div>
-
-      {/* Mobile Bottom Navigation Bar (iOS Bottom Bar) */}
+      {/* Mobile Bottom Navigation Bar (Apple HIG Tab Bar) */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#FFE600] border-t-3 border-black shadow-[0_-3px_0px_#121212] px-1.5 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <div className="grid grid-cols-5 gap-1 text-[9px] font-black uppercase text-center">
           <button

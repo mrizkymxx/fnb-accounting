@@ -13,7 +13,8 @@ import {
   Clock,
   Receipt,
   PlusCircle,
-  CreditCard
+  CreditCard,
+  Plus
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -59,42 +60,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-6">
-      {/* Header Banner - Highly compact on Mobile */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-5 border-3 sm:border-4 border-black shadow-[3px_3px_0px_#121212] sm:shadow-[5px_5px_0px_#121212]">
-        <div>
-          <div className="inline-block bg-[#FFE600] border-2 border-black px-2 py-0.5 text-[10px] font-black uppercase tracking-wider mb-1">
-            CONTROL CENTER
+      {/* Header Banner with Clean In-Flow Action Buttons */}
+      <div className="bg-white p-3.5 sm:p-5 border-3 sm:border-4 border-black shadow-[3px_3px_0px_#121212] sm:shadow-[5px_5px_0px_#121212] space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div className="inline-block bg-[#FFE600] border-2 border-black px-2 py-0.5 text-[10px] font-black uppercase tracking-wider mb-1">
+              CONTROL CENTER
+            </div>
+            <h1 className="text-lg sm:text-2xl font-black text-black tracking-tight uppercase leading-tight">
+              Ringkasan Operasional FnB
+            </h1>
+            <p className="text-[11px] sm:text-xs font-bold text-black/70 mt-0.5">
+              Pantau uang kasir dipegang, dana belanja mengendap, & tempo supplier.
+            </p>
           </div>
-          <h1 className="text-lg sm:text-2xl font-black text-black tracking-tight uppercase leading-tight">
-            Ringkasan Operasional FnB
-          </h1>
-          <p className="text-[11px] sm:text-xs font-bold text-black/70 mt-0.5">
-            Pantau uang kasir dipegang, dana belanja mengendap, & tempo supplier.
-          </p>
         </div>
-        <div className="hidden sm:flex items-center gap-2">
+
+        {/* Action Buttons Toolbar (Professional Grid for Mobile & Desktop) */}
+        <div className="grid grid-cols-3 gap-2 pt-1 border-t-2 border-black/10">
           <button
             onClick={onOpenNewAdvance}
-            className="px-3 py-2 bg-[#00F0FF] border-2 border-black text-black text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px]"
+            className="py-2.5 px-2 bg-[#00F0FF] border-2 border-black text-black text-[11px] sm:text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex items-center justify-center gap-1"
           >
-            + Dana Belanja
+            <CreditCard className="h-3.5 w-3.5 stroke-[2.5]" />
+            <span className="truncate">+ Dana Masuk</span>
           </button>
+
           <button
             onClick={onOpenCollectCash}
-            className="px-3 py-2 bg-[#FFDE59] border-2 border-black text-black text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px]"
+            className="py-2.5 px-2 bg-[#FFE600] border-2 border-black text-black text-[11px] sm:text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex items-center justify-center gap-1"
           >
-            Tarik Kasir
+            <Wallet className="h-3.5 w-3.5 stroke-[2.5]" />
+            <span className="truncate">Tarik Kasir</span>
           </button>
+
           <button
             onClick={onOpenNewPurchase}
-            className="px-4 py-2 bg-[#FF4343] text-white border-2 border-black text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px]"
+            className="py-2.5 px-2 bg-[#FF4343] text-white border-2 border-black text-[11px] sm:text-xs font-black uppercase shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex items-center justify-center gap-1"
           >
-            + Belanja
+            <PlusCircle className="h-3.5 w-3.5 stroke-[2.5]" />
+            <span className="truncate">+ Belanja</span>
           </button>
         </div>
       </div>
 
-      {/* Top 4 Metrics Grid - Responsive 2x2 on Mobile, 4 Cols on Desktop */}
+      {/* Top 4 Metrics Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Metric 1: Kas Fisik Dipegang */}
         <div className="bg-[#FFFDF5] border-3 border-black p-3 sm:p-4 shadow-[3px_3px_0px_#121212] relative flex flex-col justify-between">
