@@ -59,8 +59,15 @@ export const AIEstimatorView: React.FC = () => {
 
       const json = await res.json();
 
-      if (res.ok && json.data) {
-        const data = json.data;
+      if (!res.ok || !json.data) {
+        throw new Error(json.error || 'Gagal menghitung estimasi. Coba lagi.');
+      }
+
+      {
+        const data = {
+          ...json.data,
+          items: Array.isArray(json.data.items) ? json.data.items : []
+        };
         setResultData(data);
 
         // Buat format teks rapi khusus siap copy-paste ke WhatsApp
@@ -98,7 +105,7 @@ export const AIEstimatorView: React.FC = () => {
       }
     } catch (err) {
       console.error('Error calculating estimate:', err);
-      alert('Gagal menghitung estimasi. Periksa koneksi internet dan coba lagi.');
+      alert(err instanceof Error ? err.message : 'Gagal menghitung estimasi. Periksa koneksi internet dan coba lagi.');
     } finally {
       setIsCalculating(false);
     }
@@ -182,7 +189,7 @@ export const AIEstimatorView: React.FC = () => {
               className="w-full bg-[#FFFDF5] border-3 border-black p-3 text-xs sm:text-sm font-bold text-black focus:outline-none shadow-[2px_2px_0px_#121212] leading-relaxed"
             />
             <p className="text-[11px] font-bold text-black/70">
-              *Didukung AI Groq + 297 Kamus Resep Oklah & Prima Sushi. Otomatis mengenali singkatan, satuan pecahan, & harga estimasi pasar.
+              *Didukung AI Gemini + 297 Kamus Resep Oklah & Prima Sushi. Otomatis mengenali singkatan, satuan pecahan, & harga estimasi pasar.
             </p>
           </div>
 

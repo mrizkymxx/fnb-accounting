@@ -108,7 +108,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     .filter(b => b.status === 'active')
     .reduce((acc, b) => acc + b.remaining_amount, 0);
 
-  // Proses teks mentah chat via AI Groq (Llama 3.3 70B Versatile)
+  // Proses teks mentah chat via AI Gemini
   const handleProcessAIChat = async () => {
     if (!chatPrompt.trim()) return;
 

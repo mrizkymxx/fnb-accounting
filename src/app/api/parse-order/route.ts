@@ -1,86 +1,79 @@
 import { NextResponse } from 'next/server';
-import { INGREDIENTS_CATALOG } from '@/lib/ingredientsCatalog';
+import {
+  GeminiError,
+  generateGeminiJson,
+  PARSE_ORDER_SYSTEM_PROMPT,
+} from '@/lib/gemini';
+
+type EstimatedItem = {
+  item_name?: string;
+  raw_text?: string;
+  quantity?: number;
+  unit?: string;
+  estimated_unit_price?: number;
+  estimated_subtotal?: number;
+  matched_from_catalog?: boolean;
+  notes?: string;
+};
+
+type EstimatedOrder = {
+  detected_outlet_name?: string;
+  supplier_suggestion?: string;
+  items?: EstimatedItem[];
+  total_estimated_amount?: number;
+  summary_message?: string;
+};
+
+const OUTLETS = new Set(['Oklah', 'Prima Sushi', 'Rovu', 'Staff Meals']);
 
 export async function POST(request: Request) {
   try {
     const { textPrompt, defaultOutlet } = await request.json();
 
-    if (!textPrompt || typeof textPrompt !== 'string') {
-      return NextResponse.json({ error: 'Text prompt order is required' }, { status: 400 });
+    if (typeof textPrompt !== 'string' || !textPrompt.trim()) {
+      return NextResponse.json({ error: 'Teks pesanan wajib diisi.' }, { status: 400 });
     }
 
-    const apiKey = process.env.GROQ_API_KEY || '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';
-
-    // Format catalog ringkas untuk context AI
-    const catalogSummary = INGREDIENTS_CATALOG.map(
-      i => `{"name":"${i.name}","outlet":"${i.outlet}","unit":"${i.unit}","est_price":${i.price},"supplier":"${i.supplier}"}`
-    ).join('\n');
-
-    const systemPrompt = `Anda adalah Asisten AI Akuntansi & Estimasi Biaya Belanja FnB khusus Oklah, Prima Sushi, Rovu, dan Staff Meals.
-Tugas Anda:
-1. Analisis teks pesanan/daftar belanja mentah (dari chat WhatsApp/catatan dapur).
-2. Deteksi Target Outlet (Oklah / Prima Sushi / Rovu / Staff Meals). Jika tidak tertulis di teks, gunakan default: "${defaultOutlet || 'Oklah'}".
-3. Cocokkan setiap item belanja dengan KATALOG BAHAN RESEP di bawah.
-4. Estimasi harga satuan dan subtotal berdasarkan harga standar katalog jika ada. Jika tidak ada di katalog, beri estimasi harga pasar wajar di Indonesia (IDR).
-5. Normalisasikan kuantitas dan satuan (cth: "1/2kg" -> qty: 0.5, unit: "kg"; "3px/3pcs/3biji" -> qty: 3, unit: "pcs"; "2 Jrigen" -> qty: 2, unit: "jerigen").
-
-KATALOG REFERENSI HARGA BAHAN RESEP:
-${catalogSummary}
-
-Format respon HANYA JSON murni tanpa markdown, tanpa teks pembuka/penutup:
-{
-  "detected_outlet_name": "Prima Sushi | Oklah | Rovu | Staff Meals",
-  "supplier_suggestion": "Pasar Tradisional / Supplier Utama",
-  "items": [
-    {
-      "item_name": "Nama Barang Standar",
-      "raw_text": "Teks asli dari input",
-      "quantity": 1,
-      "unit": "kg / pcs / pack / botol / liter / jerigen",
-      "estimated_unit_price": 25000,
-      "estimated_subtotal": 25000,
-      "matched_from_catalog": true,
-      "notes": "Catatan spesifik jika ada (cth: ukuran besar)"
+    if (textPrompt.length > 20_000) {
+      return NextResponse.json({ error: 'Teks pesanan terlalu panjang.' }, { status: 400 });
     }
-  ],
-  "total_estimated_amount": 0,
-  "summary_message": "Ringkasan penjelasan ramah asisten (cth: Ditemukan 12 item belanja untuk Prima Sushi dengan total estimasi Rp...)"
-}`;
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Berikut daftar belanjaan mentah:\n\n${textPrompt}` }
-        ],
-        temperature: 0.1,
-        max_tokens: 2048,
-        response_format: { type: 'json_object' }
-      })
+    const outlet = typeof defaultOutlet === 'string' && OUTLETS.has(defaultOutlet)
+      ? defaultOutlet
+      : 'Oklah';
+    const systemPrompt = PARSE_ORDER_SYSTEM_PROMPT.replace('{defaultOutlet}', outlet);
+    const result = await generateGeminiJson<EstimatedOrder>({
+      systemInstruction: systemPrompt,
+      parts: [{ text: `Berikut daftar belanjaan mentah:\n\n${textPrompt.trim()}` }],
+      maxOutputTokens: 4096,
     });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('Groq API Error:', errText);
-      return NextResponse.json({ error: 'Gagal memproses estimasi dengan AI Groq', details: errText }, { status: 500 });
-    }
-
-    const data = await response.json();
-    const rawContent = data.choices?.[0]?.message?.content || '{}';
-    const parsedData = JSON.parse(rawContent);
+    const items = Array.isArray(result.items) ? result.items : [];
+    const estimatedItemsTotal = items.reduce(
+      (total, item) => total + Number(item.estimated_subtotal || 0),
+      0
+    );
+    const total = Number(result.total_estimated_amount);
 
     return NextResponse.json({
       success: true,
-      data: parsedData
+      data: {
+        detected_outlet_name: result.detected_outlet_name || outlet,
+        supplier_suggestion: result.supplier_suggestion || 'Pasar Tradisional',
+        items,
+        total_estimated_amount: Number.isFinite(total) ? total : estimatedItemsTotal,
+        summary_message: result.summary_message || `Ditemukan ${items.length} item belanja.`,
+      },
     });
-  } catch (error: any) {
-    console.error('AI Order Parser Error:', error);
-    return NextResponse.json({ error: 'Terjadi kesalahan sistem', message: error.message }, { status: 500 });
+  } catch (error) {
+    console.error('Gemini order parser error:', error);
+
+    if (error instanceof GeminiError) {
+      return NextResponse.json({ error: error.clientMessage }, { status: error.status });
+    }
+
+    return NextResponse.json(
+      { error: 'Terjadi kesalahan saat memproses estimasi.' },
+      { status: 500 }
+    );
   }
 }
