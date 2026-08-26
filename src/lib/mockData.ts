@@ -27,6 +27,15 @@ export const INITIAL_OUTLETS: Outlet[] = [
     status: 'construction',
     color: 'slate',
     created_at: new Date().toISOString(),
+  },
+  {
+    id: 'out_staff_meals',
+    name: 'Staff Meals',
+    type: 'internal',
+    cash_deposit_threshold: 0,
+    status: 'active',
+    color: 'purple',
+    created_at: new Date().toISOString(),
   }
 ];
 
@@ -63,6 +72,15 @@ export const INITIAL_SUPPLIERS: Supplier[] = [
     bank_account_number: '9876543210',
     bank_account_name: 'PT Nori Segar',
     created_at: new Date().toISOString(),
+  },
+  {
+    id: 'sup_staff',
+    name: 'Warung Makan & Sayur Harian',
+    category: 'Bahan Makanan Karyawan / Staff',
+    phone: '081299887711',
+    payment_terms: 'cash',
+    default_tempo_days: 0,
+    created_at: new Date().toISOString(),
   }
 ];
 
@@ -90,6 +108,18 @@ export const INITIAL_ADVANCE_BATCHES: AdvanceFundBatch[] = [
     status: 'active',
     notes: 'Khusus beli salmon & nori grade premium',
     created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'batch_staff_01',
+    outlet_id: 'out_staff_meals',
+    sender_source: 'Kas Operasional / Owner',
+    batch_name: 'Anggaran Makan Karyawan (Staff Meals)',
+    received_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    initial_amount: 500000,
+    remaining_amount: 380000,
+    status: 'active',
+    notes: 'Beras, telur, minyak & lauk pauk staff',
+    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
   }
 ];
 
@@ -128,6 +158,24 @@ export const INITIAL_PURCHASES: Purchase[] = [
       { id: 'item_4', item_name: 'Gula Pasir & Sirup Kopi', quantity: 10, unit: 'kg', unit_price: 50000, subtotal: 500000 }
     ],
     created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'pur_staff_1',
+    outlet_id: 'out_staff_meals',
+    supplier_id: 'sup_staff',
+    supplier_name: 'Warung Makan & Sayur Harian',
+    purchase_date: new Date().toISOString().split('T')[0],
+    payment_source: 'advance_transfer',
+    advance_batch_id: 'batch_staff_01',
+    total_amount: 120000,
+    is_tempo: false,
+    notes: 'Beras 5kg, Telur 1kg, Sayur sop & ayam untuk makan siang crew',
+    items: [
+      { id: 'item_s1', item_name: 'Beras Ramos 5kg', quantity: 1, unit: 'pack', unit_price: 75000, subtotal: 75000 },
+      { id: 'item_s2', item_name: 'Telur Ayam 1kg', quantity: 1, unit: 'kg', unit_price: 28000, subtotal: 28000 },
+      { id: 'item_s3', item_name: 'Bumbu & Sayuran Segar', quantity: 1, unit: 'pack', unit_price: 17000, subtotal: 17000 }
+    ],
+    created_at: new Date().toISOString(),
   }
 ];
 

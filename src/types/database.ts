@@ -1,11 +1,11 @@
-export type OutletType = 'cafe' | 'resto' | 'cafe/resto';
+export type OutletType = 'cafe' | 'resto' | 'cafe/resto' | 'internal';
 export type OutletStatus = 'active' | 'construction' | 'inactive';
 
 export interface Outlet {
   id: string;
   name: string;
   type: OutletType;
-  cash_deposit_threshold: number; // 500rb Oklah, 1jt Prima Sushi
+  cash_deposit_threshold: number; // 500rb Oklah, 1jt Prima Sushi, 0 untuk internal/staff meals
   status: OutletStatus;
   color: string;
   created_at?: string;
@@ -43,17 +43,17 @@ export interface CashCollection {
   outlet?: Outlet;
 }
 
-// BATCH TRANSFER DANA BELANJA DARI LUAR (OWNER / INVESTOR / KANTOR PUSAT)
+// BATCH TRANSFER DANA BELANJA DARI LUAR
 export type AdvanceFundStatus = 'active' | 'depleted' | 'closed';
 
 export interface AdvanceFundBatch {
   id: string;
-  outlet_id: string; // Outlet target peruntukan belanja
-  sender_source: string; // Sumber dana dari luar (cth: "Owner / Pribadi", "Investor", "Transfer Kantor Pusat", "Rekening Luar")
-  batch_name: string; // cth: "Modal Belanja Mingguan Oklah"
+  outlet_id: string;
+  sender_source: string;
+  batch_name: string;
   received_at: string;
   initial_amount: number;
-  remaining_amount: number; // sisa saldo mengendap di rekening
+  remaining_amount: number;
   status: AdvanceFundStatus;
   notes?: string;
   proof_image_url?: string;

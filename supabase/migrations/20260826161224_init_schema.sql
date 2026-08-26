@@ -92,9 +92,10 @@ create table if not exists public.purchase_items (
     created_at timestamptz default now()
 );
 
--- Seed Initial Outlets
+-- Seed Initial Outlets (Oklah, Prima Sushi, Rovu, Staff Meals)
 insert into public.outlets (name, type, cash_deposit_threshold, status) values
 ('Oklah', 'cafe', 500000.00, 'active'),
 ('Prima Sushi', 'resto', 1000000.00, 'active'),
-('Rovu', 'cafe/resto', 500000.00, 'construction')
+('Rovu', 'cafe/resto', 500000.00, 'construction'),
+('Staff Meals', 'internal', 0.00, 'active')
 on conflict (name) do nothing;
