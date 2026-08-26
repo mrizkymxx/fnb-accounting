@@ -157,7 +157,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-xs overflow-y-auto overflow-x-hidden">
       <div className="bg-[#FFFDF5] border-t-4 sm:border-4 border-black w-full max-w-3xl shadow-[8px_8px_0px_#121212] overflow-hidden rounded-t-2xl sm:rounded-none max-h-[94dvh] flex flex-col">
         {/* Modal Header */}
         <div className="flex items-center justify-between p-3.5 sm:p-4 border-b-4 border-black bg-[#FFE600] shrink-0">
