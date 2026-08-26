@@ -13,27 +13,18 @@ import {
   Share2,
   Trash2,
   FileText,
-  Building
+  Building,
+  Store
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export const AIEstimatorView: React.FC = () => {
   const { outlets } = useApp();
 
-  const [rawText, setRawText] = useState<string>(
-`Order Prima Sushi :
-- Keju Prochiz Gold 3px
-- B.Putih 1/2kg
-- Kentang 2 Biji besar / 3 Biji sedang
-- Sawi Sendok 7
-- Sabun cuci piring 2 Jrigen
-- Selada 1plastik
-- Kol putih ukuran kecil 1
-- Jeruk Nipis 6biji yang matang/ banyak airnya
-- Toge 500 gram
-- Gula 2kg
-- Udang 1/2kg
-- Ayam Paha`
+  const [rawText, setRawText] = useState<string>('');
+
+  const [selectedOutlet, setSelectedOutlet] = useState<string>(
+    outlets.length > 0 ? outlets[0].name : 'Oklah'
   );
 
   const [isCalculating, setIsCalculating] = useState(false);
@@ -53,7 +44,7 @@ export const AIEstimatorView: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           textPrompt: rawText,
-          defaultOutlet: 'Prima Sushi'
+          defaultOutlet: selectedOutlet
         })
       });
 
@@ -169,7 +160,31 @@ export const AIEstimatorView: React.FC = () => {
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-black uppercase flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4 text-[#FF4343]" />
-                <span>1. Ketik / Paste Teks Pesanan Mentah:</span>
+                <span>1. Pilih Outlet Target:</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              {outlets.map((outlet) => (
+                <button
+                  key={outlet.id}
+                  onClick={() => setSelectedOutlet(outlet.name)}
+                  className={`py-2 px-3 border-2 border-black text-xs font-black uppercase transition-all flex items-center justify-center gap-1.5 ${
+                    selectedOutlet === outlet.name
+                      ? 'bg-[#FFE600] text-black shadow-[2px_2px_0px_#121212]'
+                      : 'bg-white text-black hover:bg-slate-50'
+                  }`}
+                >
+                  <Store className="h-3.5 w-3.5 stroke-[2.5]" />
+                  <span>{outlet.name}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-black/10">
+              <label className="text-xs font-black text-black uppercase flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-[#FF4343]" />
+                <span>2. Ketik / Paste Teks Pesanan Mentah:</span>
               </label>
               <button
                 onClick={() => setRawText('')}
@@ -185,7 +200,7 @@ export const AIEstimatorView: React.FC = () => {
               rows={12}
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
-              placeholder="Ketik pesanan cth:&#10;Order Prima Sushi :&#10;- Keju Prochiz Gold 3px&#10;- B.Putih 1/2kg&#10;- Kentang 2 Biji&#10;- Sawi Sendok 7..."
+              placeholder="Ketik pesanan, contoh:&#10;- Keju Prochiz Gold 3px&#10;- B.Putih 1/2kg&#10;- Kentang 2 Biji besar&#10;- Sawi Sendok 7&#10;- Sabun cuci piring 2 Jrigen"
               className="w-full bg-[#FFFDF5] border-3 border-black p-3 text-xs sm:text-sm font-bold text-black focus:outline-none shadow-[2px_2px_0px_#121212] leading-relaxed"
             />
             <p className="text-[11px] font-bold text-black/70">
@@ -219,7 +234,7 @@ export const AIEstimatorView: React.FC = () => {
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-black uppercase flex items-center gap-1.5">
                 <FileText className="h-4 w-4 text-[#2E9E66]" />
-                <span>2. Hasil Format Pesan WhatsApp:</span>
+                <span>3. Hasil Format Pesan WhatsApp:</span>
               </label>
 
               {resultData && (
