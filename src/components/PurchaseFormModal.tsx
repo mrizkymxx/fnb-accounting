@@ -28,7 +28,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   const { outlets, suppliers, advanceBatches, addPurchase, updatePurchase, selectedOutletId } = useApp();
 
   // Form states
-  const [outletId, setOutletId] = useState<string>('out_oklah');
+  const [outletId, setOutletId] = useState<string>('');
   const [supplierId, setSupplierId] = useState<string>('');
   const [supplierName, setSupplierName] = useState<string>('Pasar Tradisional / Supplier');
   const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -69,7 +69,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       setItems(initialData.items && initialData.items.length > 0 ? initialData.items : [
         { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
       ]);
-    } else {
+    } else if (isOpen) {
       setOutletId(selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || ''));
       setSupplierId('');
       setSupplierName('Pasar Tradisional / Supplier');
@@ -79,6 +79,9 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       setIsTempo(false);
       setNotes('');
       setReceiptImage(null);
+      setItems([
+        { id: `${Date.now()}_0`, item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
+      ]);
     }
   }, [initialData, isOpen, selectedOutletId, outlets]);
 

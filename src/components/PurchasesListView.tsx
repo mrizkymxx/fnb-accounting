@@ -221,18 +221,20 @@ export const PurchasesListView: React.FC<PurchasesListViewProps> = ({
                   </div>
 
                   {/* Items */}
-                  <div className="bg-[#FFFDF5] p-2 sm:p-2.5 border-2 border-black text-xs">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
-                      {p.items.map((it, idx) => (
-                        <div key={it.id || idx} className="text-black font-semibold flex items-center justify-between gap-2 border-b border-black/10 pb-0.5 sm:border-0 sm:pb-0">
-                          <span className="truncate">{it.item_name}</span>
-                          <span className="text-black/70 font-mono text-[11px] shrink-0">
-                            {it.quantity} {it.unit} • {formatRupiah(it.subtotal)}
-                          </span>
-                        </div>
-                      ))}
+                  {p.items && p.items.length > 0 && (
+                    <div className="bg-[#FFFDF5] p-2 sm:p-2.5 border-2 border-black text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
+                        {p.items.map((it, idx) => (
+                          <div key={it.id || idx} className="text-black font-semibold flex items-center justify-between gap-2 border-b border-black/10 pb-0.5 sm:border-0 sm:pb-0">
+                            <span className="truncate">{it.item_name}</span>
+                            <span className="text-black/70 font-mono text-[11px] shrink-0">
+                              {it.quantity} {it.unit} • {formatRupiah(it.subtotal || it.unit_price || 0)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {p.notes && (
                     <p className="text-xs font-bold text-black/70 italic">
