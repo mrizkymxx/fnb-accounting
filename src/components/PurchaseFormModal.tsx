@@ -116,6 +116,41 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     ]);
   };
 
+  // Keyboard shortcut: Tambah baris saat tekan Enter di input Harga terakhir
+  const handlePriceKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (index === items.length - 1) {
+        addItemRow();
+      }
+      // Pindahkan fokus ke input nama barang baris baru
+      setTimeout(() => {
+        const nextInput = document.getElementById(`item-name-${index + 1}`);
+        if (nextInput) {
+          nextInput.focus();
+        }
+      }, 50);
+    }
+  };
+
+  // Keyboard shortcut: Alt+A atau Ctrl+Shift+A untuk tambah baris kapan saja
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.altKey && e.key.toLowerCase() === 'a') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a')) {
+        e.preventDefault();
+        addItemRow();
+        setTimeout(() => {
+          const allInputs = document.querySelectorAll('input[id^="item-name-"]');
+          const lastInput = allInputs[allInputs.length - 1] as HTMLInputElement;
+          if (lastInput) lastInput.focus();
+        }, 50);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [isOpen, items.length]);
+
   const removeItemRow = (index: number) => {
     if (items.length <= 1) return;
     setItems(prev => prev.filter((_, i) => i !== index));
@@ -530,16 +565,21 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
           {/* Detail Item Barang */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-black text-black uppercase">
-                Rincian Barang & Harga ({items.length} Item)
-              </label>
+              <div>
+                <label className="text-xs font-black text-black uppercase">
+                  Rincian Barang & Harga ({items.length} Item)
+                </label>
+                <span className="text-[10px] font-bold text-black/60 block">
+                  💡 Tekan <kbd className="px-1 py-0.5 bg-black/10 border border-black text-[9px] font-mono">Enter</kbd> di kolom Harga atau <kbd className="px-1 py-0.5 bg-black/10 border border-black text-[9px] font-mono">Alt + A</kbd> untuk tambah baris
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={addItemRow}
-                className="text-xs font-black text-black uppercase flex items-center gap-1 bg-[#00F0FF] border-2 border-black px-2.5 py-1 shadow-[2px_2px_0px_#121212]"
+                className="text-xs font-black text-black uppercase flex items-center gap-1 bg-[#00F0FF] border-2 border-black px-2.5 py-1 shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px]"
               >
                 <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-                <span>+ Baris</span>
+                <span>+ Baris (Alt+A)</span>
               </button>
             </div>
 
@@ -551,6 +591,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                 >
                   <div className="col-span-12 sm:col-span-5">
                     <input
+                      id={`item-name-${index}`}
                       type="text"
                       placeholder="Nama barang (cth: Keju Prochiz, B.Putih)"
                       value={item.item_name}
@@ -589,6 +630,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                       placeholder="Harga"
                       value={item.unit_price || ''}
                       onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
+                      onKeyDown={(e) => handlePriceKeyDown(e, index)}
                       className="w-full bg-[#FFFDF5] border-2 border-black p-1.5 text-xs font-black text-black text-right focus:outline-none"
                     />
                   </div>
