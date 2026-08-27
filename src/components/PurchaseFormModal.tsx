@@ -54,15 +54,16 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
   ]);
 
+  // Sync outletId default saat outlets selesai dimuat atau modal dibuka
   useEffect(() => {
     if (initialData) {
-      setOutletId(initialData.outlet_id);
+      setOutletId(initialData.outlet_id || (outlets[0]?.id || ''));
       setSupplierId(initialData.supplier_id || '');
-      setSupplierName(initialData.supplier_name);
-      setPurchaseDate(initialData.purchase_date);
-      setPaymentSource(initialData.payment_source);
+      setSupplierName(initialData.supplier_name || 'Pasar Tradisional / Supplier');
+      setPurchaseDate(initialData.purchase_date || new Date().toISOString().split('T')[0]);
+      setPaymentSource(initialData.payment_source || 'advance_transfer');
       setAdvanceBatchId(initialData.advance_batch_id || 'auto_fifo');
-      setIsTempo(initialData.is_tempo);
+      setIsTempo(Boolean(initialData.is_tempo));
       setTempoDueDate(initialData.tempo_due_date || '');
       setNotes(initialData.notes || '');
       setReceiptImage(initialData.receipt_image_url || null);
@@ -70,7 +71,8 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
         { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
       ]);
     } else if (isOpen) {
-      setOutletId(selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || ''));
+      const defaultId = selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || '');
+      setOutletId(defaultId);
       setSupplierId('');
       setSupplierName('Pasar Tradisional / Supplier');
       setPurchaseDate(new Date().toISOString().split('T')[0]);
@@ -87,13 +89,16 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
   if (!isOpen) return null;
 
-  const outletAdvanceBatches = advanceBatches.filter(
-    b => b.outlet_id === outletId && (b.status === 'active' || b.id === advanceBatchId)
+  const currentOutletId = outletId || (selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || ''));
+  const safeAdvanceBatches = Array.isArray(advanceBatches) ? advanceBatches : [];
+
+  const outletAdvanceBatches = safeAdvanceBatches.filter(
+    b => b && b.outlet_id === currentOutletId && (b.status === 'active' || b.id === advanceBatchId)
   );
 
   const totalOutletRemaining = outletAdvanceBatches
-    .filter(b => b.status === 'active')
-    .reduce((acc, b) => acc + b.remaining_amount, 0);
+    .filter(b => b && b.status === 'active')
+    .reduce((acc, b) => acc + (b.remaining_amount || 0), 0);
 
   const handleItemChange = (index: number, field: keyof PurchaseItem, value: any) => {
     const updated = [...items];
