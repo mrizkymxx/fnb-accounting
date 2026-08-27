@@ -131,10 +131,10 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       if (index === items.length - 1) {
         addItemRow();
       }
-      // Pindahkan fokus ke input nama barang baris baru
+      // Pindahkan fokus ke input nama barang baris baru jika ada
       setTimeout(() => {
         const nextInput = document.getElementById(`item-name-${index + 1}`);
-        if (nextInput) {
+        if (nextInput && typeof nextInput.focus === 'function') {
           nextInput.focus();
         }
       }, 50);
@@ -145,13 +145,17 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if ((e.altKey && e.key.toLowerCase() === 'a') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a')) {
+      if ((e.altKey && e.key && e.key.toLowerCase() === 'a') || (e.ctrlKey && e.shiftKey && e.key && e.key.toLowerCase() === 'a')) {
         e.preventDefault();
         addItemRow();
         setTimeout(() => {
           const allInputs = document.querySelectorAll('input[id^="item-name-"]');
-          const lastInput = allInputs[allInputs.length - 1] as HTMLInputElement;
-          if (lastInput) lastInput.focus();
+          if (allInputs.length > 0) {
+            const lastInput = allInputs[allInputs.length - 1] as HTMLInputElement;
+            if (lastInput && typeof lastInput.focus === 'function') {
+              lastInput.focus();
+            }
+          }
         }, 50);
       }
     };
