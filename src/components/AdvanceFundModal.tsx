@@ -150,9 +150,8 @@ export const AdvanceFundModal: React.FC<AdvanceFundModalProps> = ({ isOpen, onCl
             <input
               type="number"
               inputMode="numeric"
-              pattern="[0-9]*"
-              min="1000"
-              step="1000"
+              min="1"
+              step="any"
               value={amount || ''}
               onChange={(e) => setAmount(Number(e.target.value))}
               placeholder="Contoh: 1500000"

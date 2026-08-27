@@ -121,7 +121,7 @@ export const CashSettlementModal: React.FC<CashSettlementModalProps> = ({
                 type="number"
                 inputMode="numeric"
                 min="0"
-                step="1000"
+                step="any"
                 value={openingCash || ''}
                 onChange={(e) => setOpeningCash(Number(e.target.value))}
                 placeholder="Contoh: 300000"

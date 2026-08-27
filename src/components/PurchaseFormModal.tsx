@@ -636,6 +636,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                   <div className="col-span-4 sm:col-span-2">
                     <input
                       type="number"
+                      step="any"
                       placeholder="Harga"
                       value={item.unit_price || ''}
                       onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}

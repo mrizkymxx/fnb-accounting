@@ -156,7 +156,7 @@ export const OutletManagerModal: React.FC<OutletManagerModalProps> = ({ isOpen, 
                   </label>
                   <input
                     type="number"
-                    step="50000"
+                    step="any"
                     min="0"
                     value={threshold}
                     onChange={(e) => setThreshold(Number(e.target.value))}
