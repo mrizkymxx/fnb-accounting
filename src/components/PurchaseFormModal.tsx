@@ -579,21 +579,16 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
           {/* Detail Item Barang */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <div>
-                <label className="text-xs font-black text-black uppercase">
-                  Rincian Barang & Harga ({items.length} Item)
-                </label>
-                <span className="text-[10px] font-bold text-black/60 block">
-                  💡 Tekan <kbd className="px-1 py-0.5 bg-black/10 border border-black text-[9px] font-mono">Enter</kbd> di kolom Harga atau <kbd className="px-1 py-0.5 bg-black/10 border border-black text-[9px] font-mono">Alt + A</kbd> untuk tambah baris
-                </span>
-              </div>
+              <label className="text-xs font-black text-black uppercase">
+                Rincian Barang & Harga ({items.length} Item)
+              </label>
               <button
                 type="button"
                 onClick={addItemRow}
                 className="text-xs font-black text-black uppercase flex items-center gap-1 bg-[#00F0FF] border-2 border-black px-2.5 py-1 shadow-[2px_2px_0px_#121212] active:translate-x-[1px] active:translate-y-[1px]"
               >
                 <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-                <span>+ Baris (Alt+A)</span>
+                <span>+ Baris</span>
               </button>
             </div>
 
