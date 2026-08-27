@@ -167,8 +167,16 @@ export async function generateGeminiJson<T>({
     );
   }
 
+  // Sanitasi JSON dari kemungkinan markdown fence (```json ... ```) atau trailing comma
+  const sanitizedContent = rawContent
+    .replace(/^﻿/, '')
+    .replace(/^```(?:json)?\s*/gi, '')
+    .replace(/\s*```$/gi, '')
+    .replace(/,\s*([}\]])/g, '$1')
+    .trim();
+
   try {
-    return JSON.parse(rawContent) as T;
+    return JSON.parse(sanitizedContent) as T;
   } catch {
     throw new GeminiError(
       `Gemini returned invalid JSON: ${rawContent}`,
