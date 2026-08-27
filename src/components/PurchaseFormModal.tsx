@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { PurchaseItem, PaymentSource } from '@/types/database';
 import { formatRupiah, getLocalDateString, parseNumberInput } from '@/lib/formatters';
-import { compressReceiptImage } from '@/lib/imageCompressor';
+import { uploadReceiptFile } from '@/lib/storageUtils';
 import {
   X,
   Plus,
@@ -13,7 +13,9 @@ import {
   Calculator,
   ArrowRight,
   Camera,
-  Calendar
+  Calendar,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 
 interface PurchaseFormModalProps {
@@ -41,22 +43,81 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   const [tempoDueDate, setTempoDueDate] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
-  const [isCompressing, setIsCompressing] = useState<boolean>(false);
+  const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
+  const [isScanningOCR, setIsScanningOCR] = useState<boolean>(false);
+  const [ocrSuccessMessage, setOcrSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const handleReceiptImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      setIsCompressing(true);
-      const compressed = await compressReceiptImage(file, 1200, 0.72);
-      setReceiptImage(compressed);
-    } catch {
-      const reader = new FileReader();
-      reader.onloadend = () => setReceiptImage(reader.result as string);
-      reader.readAsDataURL(file);
+      setIsUploadingImage(true);
+      setOcrSuccessMessage(null);
+      // Upload otomatis ke Supabase CDN Storage / fallback base64 terkompresi
+      const uploadedUrl = await uploadReceiptFile(file, 'purchases');
+      setReceiptImage(uploadedUrl);
+    } catch (err) {
+      console.warn('Gagal upload gambar:', err);
     } finally {
-      setIsCompressing(false);
+      setIsUploadingImage(false);
+    }
+  };
+
+  // Panggil AI OCR untuk membaca foto nota secara otomatis dan mengisi tabel barang
+  const handleRunAIReceiptScan = async () => {
+    if (!receiptImage) return;
+    setIsScanningOCR(true);
+    setOcrSuccessMessage(null);
+
+    try {
+      const res = await fetch('/api/ocr-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: receiptImage }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Gagal membaca nota');
+      }
+
+      const extracted = data.data;
+
+      // Auto-fill nama supplier jika terdeteksi
+      if (extracted.supplier_name && extracted.supplier_name !== 'Pasar Segar / Supplier') {
+        setSupplierName(extracted.supplier_name);
+        const match = suppliers.find(s => s.name.toLowerCase().includes(extracted.supplier_name.toLowerCase()));
+        if (match) setSupplierId(match.id);
+      }
+
+      // Auto-fill tanggal transaksi jika terdeteksi
+      if (extracted.purchase_date) {
+        setPurchaseDate(extracted.purchase_date);
+      }
+
+      // Auto-fill daftar barang
+      if (extracted.items && extracted.items.length > 0) {
+        const mappedItems: PurchaseItem[] = extracted.items.map((it: any, i: number) => ({
+          id: `${Date.now()}_${i}`,
+          item_name: it.item_name || '',
+          quantity: parseNumberInput(it.quantity) || 1,
+          unit: it.unit || 'pcs',
+          unit_price: parseNumberInput(it.subtotal || it.unit_price) || 0,
+          subtotal: parseNumberInput(it.subtotal || it.unit_price) || 0,
+        }));
+        setItems(mappedItems);
+        setOcrSuccessMessage(`✨ Berhasil mengekstrak ${mappedItems.length} item dari foto nota!`);
+      }
+
+      if (extracted.notes) {
+        setNotes(prev => prev ? `${prev} • ${extracted.notes}` : extracted.notes);
+      }
+    } catch (err) {
+      console.warn('AI OCR Error:', err);
+      alert('AI belum dapat membaca teks nota ini secara otomatis. Anda tetap dapat mengisi rincian barang secara manual.');
+    } finally {
+      setIsScanningOCR(false);
     }
   };
 
@@ -590,13 +651,20 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
           </div>
 
           {/* Upload Foto Nota */}
-          <div className="p-3 bg-white border-3 border-black shadow-[3px_3px_0px_#121212]">
-            <label className="block text-xs font-black text-black uppercase mb-1.5">
-              Foto Nota / Struk Belanja
-            </label>
+          <div className="p-3 bg-white border-3 border-black shadow-[3px_3px_0px_#121212] space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-black text-black uppercase">
+                Foto Nota / Struk Belanja
+              </label>
+              {isUploadingImage && (
+                <span className="text-[10px] font-bold text-black flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Mengompres & upload...
+                </span>
+              )}
+            </div>
             <label className="w-full cursor-pointer flex items-center justify-center gap-2 p-3 bg-[#FFFDF5] border-2 border-dashed border-black hover:bg-slate-50 text-xs font-black uppercase transition-all">
               <Camera className="h-4 w-4 stroke-[2.5]" />
-              <span>{receiptImage ? '✓ Nota Sudah Terlampir — Ketuk untuk Ganti' : 'Ketuk untuk Upload Foto Nota'}</span>
+              <span>{receiptImage ? '✓ Nota Terlampir — Ketuk untuk Ganti Foto' : 'Ketuk untuk Upload Foto Nota'}</span>
               <input
                 type="file"
                 accept="image/*"
@@ -605,16 +673,51 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
               />
             </label>
             {receiptImage && (
-              <div className="flex items-center gap-2 mt-2 bg-[#FFE600] p-2 border-2 border-black">
-                <img src={receiptImage} alt="Nota" className="h-10 w-10 object-cover border border-black" />
-                <span className="text-xs font-black text-black">✓ NOTA TERLAMPIR</span>
-                <button
-                  type="button"
-                  onClick={() => setReceiptImage(null)}
-                  className="ml-auto text-[10px] font-bold text-red-600 hover:text-red-800 border border-red-600 px-1.5 py-0.5"
-                >
-                  Hapus
-                </button>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 bg-[#FFE600] p-2 border-2 border-black">
+                  <img src={receiptImage} alt="Nota" className="h-10 w-10 object-cover border border-black" />
+                  <div>
+                    <span className="text-xs font-black text-black block">✓ NOTA TERLAMPIR</span>
+                    <span className="text-[9px] text-black/80">Tersimpan aman di CDN</span>
+                  </div>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleRunAIReceiptScan}
+                      disabled={isScanningOCR}
+                      className="px-2.5 py-1 bg-[#00F0FF] border border-black text-[10px] font-black uppercase flex items-center gap-1 shadow-[1px_1px_0px_#121212] disabled:opacity-50"
+                      title="Pindai nota otomatis dengan AI"
+                    >
+                      {isScanningOCR ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span>Membaca...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3 w-3" />
+                          <span>Scan AI Otomatis</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReceiptImage(null);
+                        setOcrSuccessMessage(null);
+                      }}
+                      className="text-[10px] font-bold text-red-600 hover:text-red-800 border border-red-600 px-1.5 py-0.5 bg-white"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                </div>
+
+                {ocrSuccessMessage && (
+                  <div className="p-2 bg-emerald-100 border-2 border-black text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                    <span>{ocrSuccessMessage}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
