@@ -52,7 +52,7 @@ export function generateAuditReport(
         outlet_name: outlet?.name || p.outlet_id,
         title: `Belanja ${p.supplier_name}`,
         amount: p.total_amount,
-        details: `${p.items?.length || 0} item barang (${p.payment_source.replace('_', ' ')})`,
+        details: `${p.items?.length || 0} item barang (${(p.payment_source || '').replace('_', ' ')})`,
         has_receipt: Boolean(p.receipt_image_url),
       });
     }

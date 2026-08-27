@@ -105,7 +105,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setOutlets(outletsRes.data as Outlet[]);
           setSuppliers((suppliersRes.data as Supplier[]) || []);
           setAdvanceBatches((batchesRes.data as AdvanceFundBatch[]) || []);
-          setPurchases((purchasesRes.data as Purchase[]) || []);
+          const mappedPurchases = ((purchasesRes.data as Purchase[]) || []).map(p => ({
+            ...p,
+            items: Array.isArray(p.items) ? p.items : []
+          }));
+          setPurchases(mappedPurchases);
           setCollections((collectionsRes.data as CashCollection[]) || []);
           setIsCloudSyncActive(true);
           return;
@@ -125,7 +129,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setOutlets(storedOutlets ? JSON.parse(storedOutlets) : INITIAL_OUTLETS);
       setSuppliers(storedSuppliers ? JSON.parse(storedSuppliers) : INITIAL_SUPPLIERS);
-      setPurchases(storedPurchases ? JSON.parse(storedPurchases) : INITIAL_PURCHASES);
+      const parsedPurchases = storedPurchases ? JSON.parse(storedPurchases) : INITIAL_PURCHASES;
+      const safePurchases = Array.isArray(parsedPurchases)
+        ? parsedPurchases.map((p: any) => ({ ...p, items: Array.isArray(p.items) ? p.items : [] }))
+        : INITIAL_PURCHASES;
+      setPurchases(safePurchases);
       setCollections(storedCollections ? JSON.parse(storedCollections) : INITIAL_COLLECTIONS);
       setAdvanceBatches(storedBatches ? JSON.parse(storedBatches) : INITIAL_ADVANCE_BATCHES);
     } catch {

@@ -519,9 +519,11 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                       onChange={(e) => {
                         const days = Number(e.target.value) || 0;
                         setTempoDays(days);
-                        const due = new Date(purchaseDate || Date.now());
-                        due.setDate(due.getDate() + days);
-                        setTempoDueDate(due.toISOString().split('T')[0]);
+                        const base = new Date(purchaseDate || Date.now());
+                        if (!isNaN(base.getTime())) {
+                          base.setDate(base.getDate() + days);
+                          setTempoDueDate(base.toISOString().split('T')[0]);
+                        }
                       }}
                       className="w-full bg-white border-2 border-black p-1.5 text-xs font-bold text-black"
                     />

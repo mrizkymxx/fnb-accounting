@@ -33,6 +33,13 @@ export const CashSettlementModal: React.FC<CashSettlementModalProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [openingCash, setOpeningCash] = useState<number>(0);
 
+  // Sync outletId saat outlets selesai dimuat atau berubah
+  React.useEffect(() => {
+    if (!outletId && outlets.length > 0) {
+      setOutletId(outlets[0].id);
+    }
+  }, [outlets, outletId]);
+
   const matchedPurchases = useMemo(() => {
     return purchases.filter(p => {
       if (p.outlet_id !== outletId) return false;

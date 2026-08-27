@@ -216,7 +216,7 @@ export const PurchasesListView: React.FC<PurchasesListViewProps> = ({
                       </span>
                     )}
                     <span className="text-[9px] px-1.5 py-0.2 border border-black bg-[#FFFDF5] text-black font-mono uppercase">
-                      {p.payment_source.replace('_', ' ')}
+                      {(p.payment_source || '').replace('_', ' ')}
                     </span>
                   </div>
 

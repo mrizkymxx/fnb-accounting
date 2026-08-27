@@ -395,7 +395,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </span>
                       </div>
                       <p className="text-[10px] font-semibold text-black/70 truncate">
-                        {p.notes || `${p.items.length} item`}
+                        {p.notes || `${p.items?.length || 0} item`}
                       </p>
                     </div>
 
@@ -458,7 +458,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </span>
                       </div>
                       <div className="text-[10px] font-bold text-black/60 truncate">
-                        {formatDateIndo(p.purchase_date)} • {p.items?.length || 0} item • {p.payment_source.replace('_', ' ')}
+                        {formatDateIndo(p.purchase_date)} • {p.items?.length || 0} item • {(p.payment_source || '').replace('_', ' ')}
                       </div>
                     </div>
 

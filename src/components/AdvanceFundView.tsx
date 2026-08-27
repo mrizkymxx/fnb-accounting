@@ -92,7 +92,7 @@ export const AdvanceFundView: React.FC<AdvanceFundViewProps> = ({
     }
 
     const firstBatch = advanceBatches.find(b => b.id === selectedBatchIds[0]);
-    const targetOutletId = firstBatch ? firstBatch.outlet_id : (selectedOutletId !== 'all' ? selectedOutletId : outlets[0].id);
+    const targetOutletId = firstBatch ? firstBatch.outlet_id : (selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || ''));
 
     await consolidateAdvanceBatches(targetOutletId, selectedBatchIds, consolidatedName.trim() || undefined);
 

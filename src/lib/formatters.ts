@@ -26,6 +26,7 @@ export function getDaysRemaining(dueDateStr?: string): { days: number; isOverdue
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const due = new Date(dueDateStr);
+  if (isNaN(due.getTime())) return { days: 0, isOverdue: false, label: '-' };
   due.setHours(0, 0, 0, 0);
 
   const diffTime = due.getTime() - today.getTime();
