@@ -14,14 +14,23 @@ interface AdvanceFundModalProps {
 export const AdvanceFundModal: React.FC<AdvanceFundModalProps> = ({ isOpen, onClose }) => {
   const { outlets, addAdvanceFundBatch, selectedOutletId } = useApp();
 
-  const [outletId, setOutletId] = useState<string>(
-    selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || 'out_oklah')
-  );
+  const [outletId, setOutletId] = useState<string>('');
   const [senderSource, setSenderSource] = useState<string>('Owner / Rekening Luar');
   const [batchName, setBatchName] = useState('');
   const [amount, setAmount] = useState<number>(0);
   const [notes, setNotes] = useState('');
   const [proofImage, setProofImage] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setOutletId(selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || ''));
+      setSenderSource('Owner / Rekening Luar');
+      setBatchName('');
+      setAmount(0);
+      setNotes('');
+      setProofImage(null);
+    }
+  }, [isOpen, selectedOutletId, outlets]);
 
   if (!isOpen) return null;
 

@@ -70,7 +70,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
         { id: '1', item_name: '', quantity: 1, unit: 'pcs', unit_price: 0, subtotal: 0 }
       ]);
     } else {
-      setOutletId(selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || 'out_oklah'));
+      setOutletId(selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || ''));
       setSupplierId('');
       setSupplierName('Pasar Tradisional / Supplier');
       setPurchaseDate(new Date().toISOString().split('T')[0]);

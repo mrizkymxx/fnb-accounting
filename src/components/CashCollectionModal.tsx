@@ -19,7 +19,7 @@ export const CashCollectionModal: React.FC<CashCollectionModalProps> = ({
 }) => {
   const { outlets, addCashCollection, updateCashCollection, selectedOutletId } = useApp();
 
-  const [outletId, setOutletId] = useState<string>('out_oklah');
+  const [outletId, setOutletId] = useState<string>('');
   const [amount, setAmount] = useState<number>(0);
   const [source, setSource] = useState<'pos_cash_drawer' | 'daily_sales' | 'other'>('pos_cash_drawer');
   const [notes, setNotes] = useState<string>('');
@@ -33,7 +33,7 @@ export const CashCollectionModal: React.FC<CashCollectionModalProps> = ({
       setNotes(initialData.notes || '');
       setProofImage(initialData.proof_image_url || null);
     } else {
-      setOutletId(selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || 'out_oklah'));
+      setOutletId(selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || ''));
       setAmount(0);
       setSource('pos_cash_drawer');
       setNotes('');

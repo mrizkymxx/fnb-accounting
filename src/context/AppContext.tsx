@@ -66,6 +66,18 @@ const STORAGE_KEYS = {
   ADVANCE_BATCHES: 'fnb_acc_advance_batches_v2',
 };
 
+// Helper to generate standard UUID v4
+const generateUUID = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -125,6 +137,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshCloudData = async () => {
+    await fetchCloudData();
+  };
+
   useEffect(() => {
     fetchCloudData().finally(() => setIsLoaded(true));
   }, []);
@@ -145,7 +161,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // 1. OUTLET CRUD
   const addOutlet = async (data: Omit<Outlet, 'id' | 'created_at'>): Promise<Outlet> => {
-    const id = `out_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const id = generateUUID();
     const newOutlet: Outlet = {
       ...data,
       id,
@@ -155,13 +171,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('outlets').insert({
+      const { error } = await client.from('outlets').insert({
         id: newOutlet.id,
         name: newOutlet.name,
         type: newOutlet.type,
         cash_deposit_threshold: newOutlet.cash_deposit_threshold,
         status: newOutlet.status,
-      }).then();
+      });
+      if (error) console.error('Supabase addOutlet error:', error);
     }
 
     return newOutlet;
@@ -172,7 +189,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('outlets').update(data).eq('id', id).then();
+      const { error } = await client.from('outlets').update(data).eq('id', id);
+      if (error) console.error('Supabase updateOutlet error:', error);
     }
   };
 
@@ -182,7 +200,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('outlets').delete().eq('id', id).then();
+      const { error } = await client.from('outlets').delete().eq('id', id);
+      if (error) console.error('Supabase deleteOutlet error:', error);
     }
   };
 
@@ -190,7 +209,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addAdvanceFundBatch = async (
     data: Omit<AdvanceFundBatch, 'id' | 'created_at' | 'remaining_amount' | 'status'>
   ): Promise<AdvanceFundBatch> => {
-    const id = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const id = generateUUID();
     const newBatch: AdvanceFundBatch = {
       ...data,
       id,
@@ -202,7 +221,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('advance_fund_batches').insert(newBatch).then();
+      const { error } = await client.from('advance_fund_batches').insert({
+        id: newBatch.id,
+        outlet_id: newBatch.outlet_id,
+        sender_source: newBatch.sender_source,
+        batch_name: newBatch.batch_name,
+        received_at: newBatch.received_at,
+        initial_amount: newBatch.initial_amount,
+        remaining_amount: newBatch.remaining_amount,
+        status: newBatch.status,
+        notes: newBatch.notes,
+        proof_image_url: newBatch.proof_image_url,
+      });
+      if (error) console.error('Supabase addAdvanceFundBatch error:', error);
     }
 
     return newBatch;
@@ -212,7 +243,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAdvanceBatches(prev => prev.map(b => b.id === id ? { ...b, ...data } : b));
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('advance_fund_batches').update(data).eq('id', id).then();
+      const { error } = await client.from('advance_fund_batches').update(data).eq('id', id);
+      if (error) console.error('Supabase updateAdvanceFundBatch error:', error);
     }
   };
 
@@ -226,7 +258,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAdvanceBatches(prev => prev.filter(b => b.id !== batchId));
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('advance_fund_batches').delete().eq('id', batchId).then();
+      const { error } = await client.from('advance_fund_batches').delete().eq('id', batchId);
+      if (error) console.error('Supabase deleteAdvanceFundBatch error:', error);
     }
   };
 
@@ -239,7 +272,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('advance_fund_batches').update({ status: 'closed' }).eq('id', batchId).then();
+      const { error } = await client.from('advance_fund_batches').update({ status: 'closed' }).eq('id', batchId);
+      if (error) console.error('Supabase closeAdvanceFundBatch error:', error);
     }
   };
 
@@ -261,7 +295,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return b;
     }));
 
-    const newId = `batch_cons_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+    const newId = generateUUID();
     const newConsolidatedBatch: AdvanceFundBatch = {
       id: newId,
       outlet_id: outletId,
@@ -279,10 +313,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('advance_fund_batches').insert(newConsolidatedBatch).then();
-      batchIds.forEach(id => {
-        client.from('advance_fund_batches').update({ status: 'closed' }).eq('id', id).then();
+      await client.from('advance_fund_batches').insert({
+        id: newConsolidatedBatch.id,
+        outlet_id: newConsolidatedBatch.outlet_id,
+        sender_source: newConsolidatedBatch.sender_source,
+        batch_name: newConsolidatedBatch.batch_name,
+        received_at: newConsolidatedBatch.received_at,
+        initial_amount: newConsolidatedBatch.initial_amount,
+        remaining_amount: newConsolidatedBatch.remaining_amount,
+        status: newConsolidatedBatch.status,
+        notes: newConsolidatedBatch.notes,
       });
+      for (const bId of batchIds) {
+        await client.from('advance_fund_batches').update({ status: 'closed' }).eq('id', bId);
+      }
     }
 
     return newConsolidatedBatch;
@@ -290,7 +334,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // 3. PURCHASE CRUD
   const addPurchase = async (newPurData: Omit<Purchase, 'id' | 'created_at'>): Promise<Purchase> => {
-    const id = `pur_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const id = generateUUID();
     const newPurchase: Purchase = {
       ...newPurData,
       id,
@@ -334,33 +378,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('purchases').insert({
+      const { error: purErr } = await client.from('purchases').insert({
         id: newPurchase.id,
         outlet_id: newPurchase.outlet_id,
-        supplier_id: newPurchase.supplier_id,
+        supplier_id: newPurchase.supplier_id || null,
         supplier_name: newPurchase.supplier_name,
         purchase_date: newPurchase.purchase_date,
         payment_source: newPurchase.payment_source,
-        advance_batch_id: newPurchase.advance_batch_id !== 'auto_fifo' ? newPurchase.advance_batch_id : null,
+        advance_batch_id: newPurchase.advance_batch_id && newPurchase.advance_batch_id !== 'auto_fifo' ? newPurchase.advance_batch_id : null,
         total_amount: newPurchase.total_amount,
         is_tempo: newPurchase.is_tempo,
-        tempo_due_date: newPurchase.tempo_due_date,
-        tempo_status: newPurchase.tempo_status,
-        receipt_image_url: newPurchase.receipt_image_url,
-        notes: newPurchase.notes,
-      }).then(() => {
-        if (newPurchase.items && newPurchase.items.length > 0) {
-          const itemsToInsert = newPurchase.items.map(it => ({
-            purchase_id: newPurchase.id,
-            item_name: it.item_name,
-            quantity: it.quantity,
-            unit: it.unit,
-            unit_price: it.unit_price,
-            subtotal: it.subtotal,
-          }));
-          client.from('purchase_items').insert(itemsToInsert).then();
-        }
+        tempo_due_date: newPurchase.tempo_due_date || null,
+        tempo_status: newPurchase.tempo_status || 'unpaid',
+        receipt_image_url: newPurchase.receipt_image_url || null,
+        notes: newPurchase.notes || null,
       });
+
+      if (purErr) {
+        console.error('Supabase insert purchase error:', purErr);
+      } else if (newPurchase.items && newPurchase.items.length > 0) {
+        const itemsToInsert = newPurchase.items.map(it => ({
+          id: generateUUID(),
+          purchase_id: newPurchase.id,
+          item_name: it.item_name,
+          quantity: it.quantity,
+          unit: it.unit,
+          unit_price: it.unit_price,
+          subtotal: it.subtotal,
+        }));
+        const { error: itemErr } = await client.from('purchase_items').insert(itemsToInsert);
+        if (itemErr) console.error('Supabase insert purchase_items error:', itemErr);
+      }
+
+      // Update remaining amount of advance batch in Supabase if applicable
+      if (newPurchase.advance_batch_id && newPurchase.advance_batch_id !== 'auto_fifo') {
+        const targetBatch = advanceBatches.find(b => b.id === newPurchase.advance_batch_id);
+        if (targetBatch) {
+          const newRem = Math.max(0, targetBatch.remaining_amount - newPurchase.total_amount);
+          await client.from('advance_fund_batches').update({
+            remaining_amount: newRem,
+            status: newRem === 0 ? 'depleted' : 'active',
+          }).eq('id', targetBatch.id);
+        }
+      }
     }
 
     return newPurchase;
@@ -395,19 +455,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('purchases').update({
+      const { error: upErr } = await client.from('purchases').update({
         outlet_id: newPurchase.outlet_id,
-        supplier_id: newPurchase.supplier_id,
+        supplier_id: newPurchase.supplier_id || null,
         supplier_name: newPurchase.supplier_name,
         purchase_date: newPurchase.purchase_date,
         payment_source: newPurchase.payment_source,
+        advance_batch_id: newPurchase.advance_batch_id && newPurchase.advance_batch_id !== 'auto_fifo' ? newPurchase.advance_batch_id : null,
         total_amount: newPurchase.total_amount,
         is_tempo: newPurchase.is_tempo,
-        tempo_due_date: newPurchase.tempo_due_date,
-        tempo_status: newPurchase.tempo_status,
-        receipt_image_url: newPurchase.receipt_image_url,
-        notes: newPurchase.notes,
-      }).eq('id', id).then();
+        tempo_due_date: newPurchase.tempo_due_date || null,
+        tempo_status: newPurchase.tempo_status || 'unpaid',
+        receipt_image_url: newPurchase.receipt_image_url || null,
+        notes: newPurchase.notes || null,
+      }).eq('id', id);
+
+      if (upErr) console.error('Supabase update purchase error:', upErr);
+
+      if (newPurchase.items && newPurchase.items.length > 0) {
+        await client.from('purchase_items').delete().eq('purchase_id', id);
+        const itemsToInsert = newPurchase.items.map(it => ({
+          id: generateUUID(),
+          purchase_id: id,
+          item_name: it.item_name,
+          quantity: it.quantity,
+          unit: it.unit,
+          unit_price: it.unit_price,
+          subtotal: it.subtotal,
+        }));
+        await client.from('purchase_items').insert(itemsToInsert);
+      }
     }
   };
 
@@ -431,7 +508,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('purchases').delete().eq('id', id).then();
+      await client.from('purchase_items').delete().eq('purchase_id', id);
+      const { error } = await client.from('purchases').delete().eq('id', id);
+      if (error) console.error('Supabase deletePurchase error:', error);
     }
   };
 
@@ -450,17 +529,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('purchases').update({
+      const { error } = await client.from('purchases').update({
         tempo_status: status,
         tempo_paid_at: status === 'paid' ? new Date().toISOString() : null,
         tempo_payment_proof_url: proofUrl || null,
-      }).eq('id', id).then();
+      }).eq('id', id);
+      if (error) console.error('Supabase updateTempoStatus error:', error);
     }
   };
 
   // 4. CASH COLLECTION CRUD
   const addCashCollection = async (data: Omit<CashCollection, 'id' | 'created_at'>): Promise<CashCollection> => {
-    const id = `col_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const id = generateUUID();
     const newCol: CashCollection = {
       ...data,
       id,
@@ -470,7 +550,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('cash_collections').insert(newCol).then();
+      const { error } = await client.from('cash_collections').insert({
+        id: newCol.id,
+        outlet_id: newCol.outlet_id,
+        collected_at: newCol.collected_at,
+        amount: newCol.amount,
+        source: newCol.source,
+        notes: newCol.notes,
+        status: newCol.status,
+        proof_image_url: newCol.proof_image_url,
+      });
+      if (error) console.error('Supabase addCashCollection error:', error);
     }
 
     return newCol;
@@ -480,7 +570,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCollections(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('cash_collections').update(data).eq('id', id).then();
+      const { error } = await client.from('cash_collections').update(data).eq('id', id);
+      if (error) console.error('Supabase updateCashCollection error:', error);
     }
   };
 
@@ -488,7 +579,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCollections(prev => prev.filter(c => c.id !== id));
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('cash_collections').delete().eq('id', id).then();
+      const { error } = await client.from('cash_collections').delete().eq('id', id);
+      if (error) console.error('Supabase deleteCashCollection error:', error);
     }
   };
 
@@ -522,7 +614,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Jika ada sisa pecahan ATM yang tidak bisa disetor (e.g. 44.300),
     // otomatis buat batch dana titipan berbentuk cash di tangan
     if (cashRemainderToAdvance && cashRemainderToAdvance > 0) {
-      const remainderBatchId = `batch_atm_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+      const remainderBatchId = generateUUID();
       const remainderBatch: AdvanceFundBatch = {
         id: remainderBatchId,
         outlet_id: outletId,
@@ -541,25 +633,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const client = supabase;
       if (isSupabaseConfigured && client) {
-        client.from('advance_fund_batches').insert(remainderBatch).then();
+        await client.from('advance_fund_batches').insert({
+          id: remainderBatch.id,
+          outlet_id: remainderBatch.outlet_id,
+          sender_source: remainderBatch.sender_source,
+          batch_name: remainderBatch.batch_name,
+          received_at: remainderBatch.received_at,
+          initial_amount: remainderBatch.initial_amount,
+          remaining_amount: remainderBatch.remaining_amount,
+          status: remainderBatch.status,
+          notes: remainderBatch.notes,
+          proof_image_url: remainderBatch.proof_image_url,
+        });
       }
     }
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('cash_collections').update({
+      const { error } = await client.from('cash_collections').update({
         status: 'deposited_to_bank',
         deposited_at: nowIso,
         deposit_bank: bankName,
         deposit_account: bankAccount,
         proof_image_url: slipUrl || null,
-      }).eq('outlet_id', outletId).eq('status', 'held_by_me').then();
+      }).eq('outlet_id', outletId).eq('status', 'held_by_me');
+      if (error) console.error('Supabase depositCashOnHand error:', error);
     }
   };
 
   // 5. SUPPLIER CRUD
   const addSupplier = async (data: Omit<Supplier, 'id' | 'created_at'>): Promise<Supplier> => {
-    const id = `sup_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const id = generateUUID();
     const newSup: Supplier = {
       ...data,
       id,
@@ -569,7 +673,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('suppliers').insert(newSup).then();
+      const { error } = await client.from('suppliers').insert({
+        id: newSup.id,
+        name: newSup.name,
+        category: newSup.category,
+        phone: newSup.phone,
+        address: newSup.address,
+        payment_terms: newSup.payment_terms,
+        default_tempo_days: newSup.default_tempo_days,
+        bank_name: newSup.bank_name,
+        bank_account_number: newSup.bank_account_number,
+        bank_account_name: newSup.bank_account_name,
+      });
+      if (error) console.error('Supabase addSupplier error:', error);
     }
 
     return newSup;
@@ -579,7 +695,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('suppliers').update(data).eq('id', id).then();
+      const { error } = await client.from('suppliers').update(data).eq('id', id);
+      if (error) console.error('Supabase updateSupplier error:', error);
     }
   };
 
@@ -587,7 +704,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSuppliers(prev => prev.filter(s => s.id !== id));
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      client.from('suppliers').delete().eq('id', id).then();
+      const { error } = await client.from('suppliers').delete().eq('id', id);
+      if (error) console.error('Supabase deleteSupplier error:', error);
     }
   };
 
