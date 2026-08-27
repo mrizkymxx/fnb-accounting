@@ -96,10 +96,13 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     const updated = [...items];
     const item = { ...updated[index], [field]: value };
 
-    if (field === 'quantity' || field === 'unit_price') {
-      const q = field === 'quantity' ? Number(value) : item.quantity;
-      const p = field === 'unit_price' ? Number(value) : item.unit_price;
-      item.subtotal = (q || 0) * (p || 0);
+    if (field === 'quantity') {
+      item.quantity = Number(value) || 0;
+    } else if (field === 'unit_price') {
+      const p = Number(value) || 0;
+      item.unit_price = p;
+      // Harga adalah subtotal langsung sesuai nota (tidak dikalikan qty)
+      item.subtotal = p;
     }
 
     updated[index] = item;
