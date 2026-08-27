@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useMemo } from '
 import { Outlet, Supplier, Purchase, CashCollection, AdvanceFundBatch, CashOnHandSummary, WalletBreakdown } from '@/types/database';
 import { INITIAL_OUTLETS, INITIAL_SUPPLIERS, INITIAL_PURCHASES, INITIAL_COLLECTIONS, INITIAL_ADVANCE_BATCHES } from '@/lib/mockData';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { formatRupiah } from '@/lib/formatters';
+import { formatRupiah, getLocalDateString } from '@/lib/formatters';
 
 interface AppContextType {
   outlets: Outlet[];
@@ -801,12 +801,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Sisa titipan yang berbentuk cash fisik (hasil pecahan ATM / cash)
     const advanceCashHolding = advanceBatches
       .filter(b => b.status === 'active' && (
-        b.sender_source.toLowerCase().includes('atm') ||
-        b.sender_source.toLowerCase().includes('cash') ||
-        b.batch_name.toLowerCase().includes('cash') ||
-        b.batch_name.toLowerCase().includes('kembalian')
+        (b.sender_source || '').toLowerCase().includes('atm') ||
+        (b.sender_source || '').toLowerCase().includes('cash') ||
+        (b.batch_name || '').toLowerCase().includes('cash') ||
+        (b.batch_name || '').toLowerCase().includes('kembalian')
       ))
-      .reduce((acc, b) => acc + b.remaining_amount, 0);
+      .reduce((acc, b) => acc + (Number(b.remaining_amount) || 0), 0);
 
     // Sisa titipan yang berbentuk saldo di rekening M-Banking
     const advanceBankBalance = Math.max(0, totalAdvanceRemainingAll - advanceCashHolding);
@@ -826,11 +826,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [advanceBatches, totalAdvanceRemainingAll, totalHeldAllOutlets]);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
   const todayExpenseTotal = useMemo(() => {
     return purchases
       .filter(p => p.purchase_date === todayStr)
-      .reduce((acc, p) => acc + p.total_amount, 0);
+      .reduce((acc, p) => acc + (Number(p.total_amount) || 0), 0);
   }, [purchases, todayStr]);
 
   return (

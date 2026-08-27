@@ -24,8 +24,6 @@ type EstimatedOrder = {
   summary_message?: string;
 };
 
-const OUTLETS = new Set(['Oklah', 'Prima Sushi', 'Rovu', 'Staff Meals']);
-
 export async function POST(request: Request) {
   try {
     const { textPrompt, defaultOutlet } = await request.json();
@@ -38,8 +36,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Teks pesanan terlalu panjang.' }, { status: 400 });
     }
 
-    const outlet = typeof defaultOutlet === 'string' && OUTLETS.has(defaultOutlet)
-      ? defaultOutlet
+    const outlet = typeof defaultOutlet === 'string' && defaultOutlet.trim()
+      ? defaultOutlet.trim()
       : 'Oklah';
     const systemPrompt = PARSE_ORDER_SYSTEM_PROMPT.replace('{defaultOutlet}', outlet);
     const result = await generateGeminiJson<EstimatedOrder>({

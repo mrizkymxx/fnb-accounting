@@ -110,10 +110,15 @@ export const AIEstimatorView: React.FC = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Fallback manual copy
+      // Fallback manual copy off-screen
       const textArea = document.createElement('textarea');
       textArea.value = formattedWhatsapp;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      textArea.style.top = '0';
+      textArea.style.opacity = '0';
       document.body.appendChild(textArea);
+      textArea.focus();
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);

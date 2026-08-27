@@ -15,9 +15,10 @@ import {
 } from 'lucide-react';
 
 export const SuppliersView: React.FC = () => {
-  const { suppliers, addSupplier, updateSupplier, deleteSupplier } = useApp();
+  const { suppliers, purchases, addSupplier, updateSupplier, deleteSupplier } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Bahan Baku Utama');
@@ -28,6 +29,15 @@ export const SuppliersView: React.FC = () => {
   const [bankName, setBankName] = useState('BCA');
   const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [bankAccountName, setBankAccountName] = useState('');
+
+  const filteredSuppliers = suppliers.filter(s => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const matchName = (s.name || '').toLowerCase().includes(q);
+    const matchCat = (s.category || '').toLowerCase().includes(q);
+    const matchPhone = (s.phone || '').toLowerCase().includes(q);
+    return matchName || matchCat || matchPhone;
+  });
 
   const handleOpenAdd = () => {
     setEditingSupplier(null);
@@ -59,15 +69,16 @@ export const SuppliersView: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    const cleanName = name.trim();
+    if (!cleanName) return;
 
     const payload = {
-      name: name.trim(),
-      category: category.trim(),
+      name: cleanName,
+      category: category.trim() || 'Bahan Baku Utama',
       phone: phone.trim() || undefined,
       address: address.trim() || undefined,
       payment_terms: paymentTerms,
-      default_tempo_days: paymentTerms === 'tempo' ? defaultTempoDays : 0,
+      default_tempo_days: paymentTerms === 'tempo' ? Math.max(0, defaultTempoDays) : 0,
       bank_name: bankName.trim() || undefined,
       bank_account_number: bankAccountNumber.trim() || undefined,
       bank_account_name: bankAccountName.trim() || undefined,
@@ -93,7 +104,7 @@ export const SuppliersView: React.FC = () => {
               Master Data Supplier & Toko
             </h1>
             <span className="px-2 py-0.5 bg-[#00F0FF] border-2 border-black text-black text-[10px] sm:text-xs font-black uppercase">
-              {suppliers.length} Supplier
+              {filteredSuppliers.length} Supplier
             </span>
           </div>
           <p className="text-xs sm:text-sm font-bold text-black/70 mt-1">
@@ -102,13 +113,20 @@ export const SuppliersView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari toko / kategori..."
+            className="bg-[#FFFDF5] border-2 border-black px-2.5 py-1.5 text-xs font-bold text-black placeholder:text-black/50 focus:outline-none max-w-[160px] sm:max-w-[200px]"
+          />
           <button
             onClick={() => exportSuppliersCSV(suppliers)}
             className="px-3 py-2 bg-white border-2 border-black text-black text-xs font-black uppercase shadow-[2px_2px_0px_#121212] hover:bg-slate-50 flex items-center gap-1.5 active:translate-x-[1px] active:translate-y-[1px]"
             title="Export CSV Excel"
           >
             <FileSpreadsheet className="h-4 w-4 stroke-[2.5]" />
-            <span>Export</span>
+            <span className="hidden sm:inline">Export</span>
           </button>
 
           <button
@@ -123,7 +141,7 @@ export const SuppliersView: React.FC = () => {
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-        {suppliers.map((s) => (
+        {filteredSuppliers.map((s) => (
           <div
             key={s.id}
             className="p-4 sm:p-5 bg-white border-3 border-black shadow-[3px_3px_0px_#121212] flex flex-col justify-between space-y-3"
@@ -185,6 +203,11 @@ export const SuppliersView: React.FC = () => {
                 </button>
                 <button
                   onClick={() => {
+                    const hasActivePurchases = purchases.some(p => p.supplier_id === s.id);
+                    if (hasActivePurchases) {
+                      alert(`Supplier "${s.name}" tidak dapat dihapus karena masih memiliki riwayat transaksi belanja.`);
+                      return;
+                    }
                     if (confirm(`Hapus supplier ${s.name}?`)) {
                       deleteSupplier(s.id);
                     }

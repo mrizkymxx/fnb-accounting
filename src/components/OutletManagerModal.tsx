@@ -58,18 +58,28 @@ export const OutletManagerModal: React.FC<OutletManagerModalProps> = ({ isOpen, 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    const cleanName = name.trim();
+    if (!cleanName) return;
+
+    // Cek duplikasi nama outlet
+    const isDuplicate = outlets.some(
+      o => o.id !== editingId && o.name.toLowerCase() === cleanName.toLowerCase()
+    );
+    if (isDuplicate) {
+      alert(`Outlet dengan nama "${cleanName}" sudah ada. Gunakan nama lain.`);
+      return;
+    }
 
     if (editingId) {
       await updateOutlet(editingId, {
-        name: name.trim(),
+        name: cleanName,
         type,
         cash_deposit_threshold: Number(threshold) || 0,
         status,
       });
     } else {
       await addOutlet({
-        name: name.trim(),
+        name: cleanName,
         type,
         cash_deposit_threshold: Number(threshold) || 0,
         status,

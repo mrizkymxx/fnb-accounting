@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { formatRupiah, formatDateIndo } from '@/lib/formatters';
+import { formatRupiah, formatDateIndo, getLocalDateString } from '@/lib/formatters';
 import { generateAuditReport, exportPeriodAuditCSV, AuditLogEntry } from '@/lib/exportUtils';
 import {
   Calendar,
@@ -22,8 +22,8 @@ import {
 export const AuditReportView: React.FC = () => {
   const { outlets, purchases, collections, advanceBatches, selectedOutletId, setSelectedOutletId } = useApp();
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const startOfMonthStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
+  const startOfMonthStr = getLocalDateString(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
   const [startDate, setStartDate] = useState<string>(startOfMonthStr);
   const [endDate, setEndDate] = useState<string>(todayStr);

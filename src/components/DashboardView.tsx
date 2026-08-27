@@ -287,7 +287,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
           {cashOnHandSummaries.map((summary) => {
             const outlet = outlets.find(o => o.id === summary.outlet_id);
-            const percentage = Math.min(100, Math.round((summary.total_held / summary.threshold) * 100));
+            const percentage = summary.threshold > 0
+              ? Math.min(100, Math.round((summary.total_held / summary.threshold) * 100))
+              : 100;
             const isReady = summary.is_ready_to_deposit;
 
             return (
