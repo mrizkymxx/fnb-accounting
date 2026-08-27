@@ -87,19 +87,6 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     }
   }, [initialData, isOpen, selectedOutletId, outlets]);
 
-  if (!isOpen) return null;
-
-  const currentOutletId = outletId || (selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || ''));
-  const safeAdvanceBatches = Array.isArray(advanceBatches) ? advanceBatches : [];
-
-  const outletAdvanceBatches = safeAdvanceBatches.filter(
-    b => b && b.outlet_id === currentOutletId && (b.status === 'active' || b.id === advanceBatchId)
-  );
-
-  const totalOutletRemaining = outletAdvanceBatches
-    .filter(b => b && b.status === 'active')
-    .reduce((acc, b) => acc + (b.remaining_amount || 0), 0);
-
   const handleItemChange = (index: number, field: keyof PurchaseItem, value: any) => {
     const updated = [...items];
     const item = { ...updated[index], [field]: value };
@@ -143,8 +130,8 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
   // Keyboard shortcut: Alt+A atau Ctrl+Shift+A untuk tambah baris kapan saja
   useEffect(() => {
-    if (!isOpen) return;
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
       if ((e.altKey && e.key && e.key.toLowerCase() === 'a') || (e.ctrlKey && e.shiftKey && e.key && e.key.toLowerCase() === 'a')) {
         e.preventDefault();
         addItemRow();
@@ -162,6 +149,19 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [isOpen, items.length]);
+
+  if (!isOpen) return null;
+
+  const currentOutletId = outletId || (selectedOutletId !== 'all' ? selectedOutletId : (outlets[0]?.id || ''));
+  const safeAdvanceBatches = Array.isArray(advanceBatches) ? advanceBatches : [];
+
+  const outletAdvanceBatches = safeAdvanceBatches.filter(
+    b => b && b.outlet_id === currentOutletId && (b.status === 'active' || b.id === advanceBatchId)
+  );
+
+  const totalOutletRemaining = outletAdvanceBatches
+    .filter(b => b && b.status === 'active')
+    .reduce((acc, b) => acc + (b.remaining_amount || 0), 0);
 
   const removeItemRow = (index: number) => {
     if (items.length <= 1) return;
