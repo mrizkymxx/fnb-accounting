@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { CashCollection } from '@/types/database';
-import { formatRupiah } from '@/lib/formatters';
+import { formatRupiah, parseNumberInput } from '@/lib/formatters';
+import { compressReceiptImage } from '@/lib/imageCompressor';
 import { X, Wallet, Camera } from 'lucide-react';
 
 interface CashCollectionModalProps {
@@ -24,6 +25,8 @@ export const CashCollectionModal: React.FC<CashCollectionModalProps> = ({
   const [source, setSource] = useState<'pos_cash_drawer' | 'daily_sales' | 'other'>('pos_cash_drawer');
   const [notes, setNotes] = useState<string>('');
   const [proofImage, setProofImage] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   useEffect(() => {
     if (initialData) {
@@ -39,51 +42,67 @@ export const CashCollectionModal: React.FC<CashCollectionModalProps> = ({
       setNotes('');
       setProofImage(null);
     }
+    setIsSubmitting(false);
   }, [initialData, isOpen, selectedOutletId, outlets]);
 
   if (!isOpen) return null;
 
   const currentOutlet = outlets.find(o => o.id === outletId);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProofImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      setIsCompressing(true);
+      const compressed = await compressReceiptImage(file, 1200, 0.72);
+      setProofImage(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProofImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (amount <= 0) {
+    if (isSubmitting) return;
+
+    const cleanAmount = parseNumberInput(amount);
+    if (cleanAmount <= 0) {
       alert('Nominal uang ditarik harus lebih dari 0');
       return;
     }
 
-    if (initialData) {
-      await updateCashCollection(initialData.id, {
-        outlet_id: outletId,
-        amount: Number(amount),
-        source,
-        notes: notes.trim() || undefined,
-        proof_image_url: proofImage || undefined,
-      });
-    } else {
-      await addCashCollection({
-        outlet_id: outletId,
-        collected_at: new Date().toISOString(),
-        amount: Number(amount),
-        source,
-        notes: notes.trim() || undefined,
-        status: 'held_by_me',
-        proof_image_url: proofImage || undefined,
-      });
+    setIsSubmitting(true);
+    try {
+      if (initialData) {
+        await updateCashCollection(initialData.id, {
+          outlet_id: outletId,
+          amount: cleanAmount,
+          source,
+          notes: notes.trim() || undefined,
+          proof_image_url: proofImage || undefined,
+        });
+      } else {
+        await addCashCollection({
+          outlet_id: outletId,
+          collected_at: new Date().toISOString(),
+          amount: cleanAmount,
+          source,
+          notes: notes.trim() || undefined,
+          status: 'held_by_me',
+          proof_image_url: proofImage || undefined,
+        });
+      }
+      onClose();
+    } finally {
+      setIsSubmitting(false);
     }
-
-    onClose();
   };
 
   return (

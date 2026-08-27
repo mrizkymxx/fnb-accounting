@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { formatRupiah } from '@/lib/formatters';
-import { X, ArrowDownRight, Camera, UserCheck } from 'lucide-react';
+import { formatRupiah, parseNumberInput } from '@/lib/formatters';
+import { compressReceiptImage } from '@/lib/imageCompressor';
+import { X, ArrowDownRight, Camera } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface AdvanceFundModalProps {
@@ -20,6 +21,8 @@ export const AdvanceFundModal: React.FC<AdvanceFundModalProps> = ({ isOpen, onCl
   const [amount, setAmount] = useState<number>(0);
   const [notes, setNotes] = useState('');
   const [proofImage, setProofImage] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -29,6 +32,7 @@ export const AdvanceFundModal: React.FC<AdvanceFundModalProps> = ({ isOpen, onCl
       setAmount(0);
       setNotes('');
       setProofImage(null);
+      setIsSubmitting(false);
     }
   }, [isOpen, selectedOutletId, outlets]);
 
@@ -36,45 +40,61 @@ export const AdvanceFundModal: React.FC<AdvanceFundModalProps> = ({ isOpen, onCl
 
   const currentOutlet = outlets.find(o => o.id === outletId);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProofImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      setIsCompressing(true);
+      const compressed = await compressReceiptImage(file, 1200, 0.72);
+      setProofImage(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProofImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (amount <= 0) {
+    if (isSubmitting) return;
+
+    const cleanAmount = parseNumberInput(amount);
+    if (cleanAmount <= 0) {
       alert('Nominal transfer dana masuk harus lebih dari 0');
       return;
     }
 
     const defaultName = `Dana Belanja ${currentOutlet?.name} dari ${senderSource} (${new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(new Date())})`;
 
-    await addAdvanceFundBatch({
-      outlet_id: outletId,
-      sender_source: senderSource.trim() || 'Pihak Luar',
-      batch_name: batchName.trim() || defaultName,
-      received_at: new Date().toISOString(),
-      initial_amount: Number(amount),
-      notes: notes.trim() || undefined,
-      proof_image_url: proofImage || undefined,
-    });
-
+    setIsSubmitting(true);
     try {
-      confetti({
-        particleCount: 60,
-        spread: 60,
-        origin: { y: 0.6 }
+      await addAdvanceFundBatch({
+        outlet_id: outletId,
+        sender_source: senderSource.trim() || 'Pihak Luar',
+        batch_name: batchName.trim() || defaultName,
+        received_at: new Date().toISOString(),
+        initial_amount: cleanAmount,
+        notes: notes.trim() || undefined,
+        proof_image_url: proofImage || undefined,
       });
-    } catch {}
 
-    onClose();
+      try {
+        confetti({
+          particleCount: 60,
+          spread: 60,
+          origin: { y: 0.6 }
+        });
+      } catch {}
+
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

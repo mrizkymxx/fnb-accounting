@@ -1,4 +1,5 @@
 import { Purchase, CashCollection, AdvanceFundBatch, Outlet, Supplier } from '@/types/database';
+import { getLocalDateString } from './formatters';
 
 export interface AuditLogEntry {
   date: string;
@@ -11,8 +12,15 @@ export interface AuditLogEntry {
   has_receipt: boolean;
 }
 
+const escapeCsv = (val: unknown): string => {
+  if (val === null || val === undefined) return '""';
+  const str = String(val).replace(/"/g, '""');
+  return `"${str}"`;
+};
+
 function downloadCSV(filename: string, content: string) {
-  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' });
+  // Disematkan UTF-8 BOM (﻿) dan header "sep=," agar Microsoft Excel otomatis memisahkan kolom dengan benar
+  const blob = new Blob([`﻿sep=,\r\n${content}`], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
@@ -111,17 +119,17 @@ export function exportPeriodAuditCSV(
 ) {
   const headers = ['Tanggal', 'Jam', 'Tipe Aktivitas', 'Outlet', 'Nama Aktivitas / Toko', 'Nominal (Rp)', 'Keterangan / Detail', 'Ada Bukti Foto / Nota'];
   const rows = logs.map(l => [
-    l.date,
-    l.time,
-    l.type,
-    `"${l.outlet_name.replace(/"/g, '""')}"`,
-    `"${l.title.replace(/"/g, '""')}"`,
+    escapeCsv(l.date),
+    escapeCsv(l.time),
+    escapeCsv(l.type),
+    escapeCsv(l.outlet_name),
+    escapeCsv(l.title),
     l.amount,
-    `"${l.details.replace(/"/g, '""')}"`,
-    l.has_receipt ? 'Ya (Foto Ada)' : 'Tidak',
+    escapeCsv(l.details),
+    escapeCsv(l.has_receipt ? 'Ya (Foto Ada)' : 'Tidak'),
   ]);
 
-  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\r\n');
   downloadCSV(`Laporan_Audit_FnB_${outletName}_${startDate}_sd_${endDate}.csv`, csvContent);
 }
 
@@ -132,22 +140,22 @@ export function exportPurchasesCSV(purchases: Purchase[], outlets: Outlet[]) {
     const outlet = outlets.find(o => o.id === p.outlet_id);
     const itemsStr = (p.items || []).map(it => `${it.item_name} (${it.quantity} ${it.unit} @ Rp${it.unit_price})`).join('; ');
     return [
-      p.id,
-      outlet?.name || p.outlet_id,
-      p.purchase_date,
-      `"${(p.supplier_name || '').replace(/"/g, '""')}"`,
-      p.payment_source,
-      p.is_tempo ? 'Ya' : 'Tidak',
-      p.tempo_due_date || '-',
-      p.is_tempo ? (p.tempo_status === 'paid' ? 'Lunas' : 'Belum Lunas') : '-',
+      escapeCsv(p.id),
+      escapeCsv(outlet?.name || p.outlet_id),
+      escapeCsv(p.purchase_date),
+      escapeCsv(p.supplier_name),
+      escapeCsv(p.payment_source),
+      escapeCsv(p.is_tempo ? 'Ya' : 'Tidak'),
+      escapeCsv(p.tempo_due_date || '-'),
+      escapeCsv(p.is_tempo ? (p.tempo_status === 'paid' ? 'Lunas' : 'Belum Lunas') : '-'),
       p.total_amount,
-      `"${itemsStr.replace(/"/g, '""')}"`,
-      `"${(p.notes || '').replace(/"/g, '""')}"`,
+      escapeCsv(itemsStr),
+      escapeCsv(p.notes || ''),
     ];
   });
 
-  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-  downloadCSV(`Rekap_Belanja_FnB_${new Date().toISOString().split('T')[0]}.csv`, csvContent);
+  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\r\n');
+  downloadCSV(`Rekap_Belanja_FnB_${getLocalDateString()}.csv`, csvContent);
 }
 
 // 2. Export Advance Funds CSV
@@ -155,23 +163,23 @@ export function exportAdvanceFundsCSV(batches: AdvanceFundBatch[], outlets: Outl
   const headers = ['ID Batch', 'Outlet', 'Nama Batch', 'Sumber Pengirim', 'Tanggal Diterima', 'Dana Awal (Rp)', 'Dana Terpakai (Rp)', 'Sisa Mengendap (Rp)', 'Status', 'Catatan'];
   const rows = batches.map(b => {
     const outlet = outlets.find(o => o.id === b.outlet_id);
-    const used = b.initial_amount - b.remaining_amount;
+    const used = Math.round(b.initial_amount - b.remaining_amount);
     return [
-      b.id,
-      outlet?.name || b.outlet_id,
-      `"${(b.batch_name || '').replace(/"/g, '""')}"`,
-      `"${(b.sender_source || '').replace(/"/g, '""')}"`,
-      b.received_at ? b.received_at.split('T')[0] : '-',
+      escapeCsv(b.id),
+      escapeCsv(outlet?.name || b.outlet_id),
+      escapeCsv(b.batch_name),
+      escapeCsv(b.sender_source),
+      escapeCsv(b.received_at ? b.received_at.split('T')[0] : '-'),
       b.initial_amount,
       used,
       b.remaining_amount,
-      b.status,
-      `"${(b.notes || '').replace(/"/g, '""')}"`,
+      escapeCsv(b.status),
+      escapeCsv(b.notes || ''),
     ];
   });
 
-  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-  downloadCSV(`Rekap_Dana_Belanja_Rekening_${new Date().toISOString().split('T')[0]}.csv`, csvContent);
+  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\r\n');
+  downloadCSV(`Rekap_Dana_Belanja_Rekening_${getLocalDateString()}.csv`, csvContent);
 }
 
 // 3. Export Cash Collection & Deposit CSV
@@ -180,21 +188,21 @@ export function exportCashCollectionsCSV(collections: CashCollection[], outlets:
   const rows = collections.map(c => {
     const outlet = outlets.find(o => o.id === c.outlet_id);
     return [
-      c.id,
-      outlet?.name || c.outlet_id,
-      c.collected_at ? c.collected_at.split('T')[0] : '-',
+      escapeCsv(c.id),
+      escapeCsv(outlet?.name || c.outlet_id),
+      escapeCsv(c.collected_at ? c.collected_at.split('T')[0] : '-'),
       c.amount,
-      c.source,
-      c.status === 'deposited_to_bank' ? 'Sudah Setor Bank' : 'Dipegang Sendiri (Held)',
-      c.deposited_at ? c.deposited_at.split('T')[0] : '-',
-      c.deposit_bank || '-',
-      `"${(c.deposit_account || '').replace(/"/g, '""')}"`,
-      `"${(c.notes || '').replace(/"/g, '""')}"`,
+      escapeCsv(c.source),
+      escapeCsv(c.status === 'deposited_to_bank' ? 'Sudah Setor Bank' : 'Dipegang Sendiri (Held)'),
+      escapeCsv(c.deposited_at ? c.deposited_at.split('T')[0] : '-'),
+      escapeCsv(c.deposit_bank || '-'),
+      escapeCsv(c.deposit_account || ''),
+      escapeCsv(c.notes || ''),
     ];
   });
 
-  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-  downloadCSV(`Rekap_Kas_Dipegang_Setor_Bank_${new Date().toISOString().split('T')[0]}.csv`, csvContent);
+  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\r\n');
+  downloadCSV(`Rekap_Kas_Dipegang_Setor_Bank_${getLocalDateString()}.csv`, csvContent);
 }
 
 // 4. Export Tempo CSV
@@ -204,38 +212,38 @@ export function exportTempoCSV(purchases: Purchase[], outlets: Outlet[]) {
   const rows = tempoList.map(p => {
     const outlet = outlets.find(o => o.id === p.outlet_id);
     return [
-      p.id,
-      outlet?.name || p.outlet_id,
-      `"${(p.supplier_name || '').replace(/"/g, '""')}"`,
-      p.purchase_date,
-      p.tempo_due_date || '-',
+      escapeCsv(p.id),
+      escapeCsv(outlet?.name || p.outlet_id),
+      escapeCsv(p.supplier_name),
+      escapeCsv(p.purchase_date),
+      escapeCsv(p.tempo_due_date || '-'),
       p.total_amount,
-      p.tempo_status === 'paid' ? 'Lunas' : 'Belum Lunas',
-      p.tempo_paid_at ? p.tempo_paid_at.split('T')[0] : '-',
-      `"${(p.notes || '').replace(/"/g, '""')}"`,
+      escapeCsv(p.tempo_status === 'paid' ? 'Lunas' : 'Belum Lunas'),
+      escapeCsv(p.tempo_paid_at ? p.tempo_paid_at.split('T')[0] : '-'),
+      escapeCsv(p.notes || ''),
     ];
   });
 
-  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-  downloadCSV(`Rekap_Hutang_Tempo_Supplier_${new Date().toISOString().split('T')[0]}.csv`, csvContent);
+  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\r\n');
+  downloadCSV(`Rekap_Hutang_Tempo_Supplier_${getLocalDateString()}.csv`, csvContent);
 }
 
 // 5. Export Suppliers CSV
 export function exportSuppliersCSV(suppliers: Supplier[]) {
   const headers = ['ID', 'Nama Supplier / Toko', 'Kategori Bahan', 'No HP / WhatsApp', 'Alamat', 'Syarat Bayar', 'Tempo (Hari)', 'Nama Bank', 'No Rekening', 'Nama Pemilik Rekening'];
   const rows = suppliers.map(s => [
-    s.id,
-    `"${(s.name || '').replace(/"/g, '""')}"`,
-    `"${(s.category || '').replace(/"/g, '""')}"`,
-    s.phone || '-',
-    `"${(s.address || '').replace(/"/g, '""')}"`,
-    s.payment_terms,
+    escapeCsv(s.id),
+    escapeCsv(s.name),
+    escapeCsv(s.category),
+    escapeCsv(s.phone || '-'),
+    escapeCsv(s.address || ''),
+    escapeCsv(s.payment_terms),
     s.default_tempo_days || 0,
-    s.bank_name || '-',
-    `"${(s.bank_account_number || '').replace(/"/g, '""')}"`,
-    `"${(s.bank_account_name || '').replace(/"/g, '""')}"`,
+    escapeCsv(s.bank_name || '-'),
+    escapeCsv(s.bank_account_number || ''),
+    escapeCsv(s.bank_account_name || ''),
   ]);
 
-  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-  downloadCSV(`Master_Data_Supplier_FnB_${new Date().toISOString().split('T')[0]}.csv`, csvContent);
+  const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\r\n');
+  downloadCSV(`Master_Data_Supplier_FnB_${getLocalDateString()}.csv`, csvContent);
 }

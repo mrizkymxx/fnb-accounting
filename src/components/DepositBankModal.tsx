@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { formatRupiah } from '@/lib/formatters';
+import { compressReceiptImage } from '@/lib/imageCompressor';
 import { X, Building2, CheckCircle2, Camera, Split, AlertCircle, ArrowRight } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -23,6 +24,8 @@ export const DepositBankModal: React.FC<DepositBankModalProps> = ({
   const [bankAccount, setBankAccount] = useState<string>('');
   const [slipImage, setSlipImage] = useState<string | null>(null);
   const [notes, setNotes] = useState<string>('');
+  const [isCompressing, setIsCompressing] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const targetSummary = cashOnHandSummaries.find(s => s.outlet_id === outletId);
   const targetOutlet = outlets.find(o => o.id === outletId);
@@ -37,19 +40,28 @@ export const DepositBankModal: React.FC<DepositBankModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setSlipImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      setIsCompressing(true);
+      const compressed = await compressReceiptImage(file, 1200, 0.72);
+      setSlipImage(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSlipImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     if (totalToDeposit <= 0) {
       alert('Tidak ada saldo kas dipegang untuk outlet ini.');
@@ -59,25 +71,30 @@ export const DepositBankModal: React.FC<DepositBankModalProps> = ({
     const atmDeposit = useAtmSplit ? atmEligibleAmount : totalToDeposit;
     const remainder = useAtmSplit ? remainderCash : 0;
 
-    await depositCashOnHand(
-      outletId,
-      bankName,
-      bankAccount.trim() || 'Rekening Operasional Utama',
-      slipImage || undefined,
-      notes.trim() || undefined,
-      atmDeposit,
-      remainder
-    );
-
+    setIsSubmitting(true);
     try {
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.6 }
-      });
-    } catch {}
+      await depositCashOnHand(
+        outletId,
+        bankName,
+        bankAccount.trim() || 'Rekening Operasional Utama',
+        slipImage || undefined,
+        notes.trim() || undefined,
+        atmDeposit,
+        remainder
+      );
 
-    onClose();
+      try {
+        confetti({
+          particleCount: 80,
+          spread: 60,
+          origin: { y: 0.6 }
+        });
+      } catch {}
+
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

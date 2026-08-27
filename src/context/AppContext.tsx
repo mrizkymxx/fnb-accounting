@@ -266,6 +266,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAdvanceBatches(prev => prev.filter(b => b.id !== batchId));
     const client = supabase;
     if (isSupabaseConfigured && client) {
+      // Lepaskan referensi FK purchases dulu sebelum menghapus batch dari Supabase
+      await client
+        .from('purchases')
+        .update({ advance_batch_id: null, payment_source: 'personal_cash' })
+        .eq('advance_batch_id', batchId);
+
       const { error } = await client.from('advance_fund_batches').delete().eq('id', batchId);
       if (error) console.error('Supabase deleteAdvanceFundBatch error:', error);
     }
@@ -438,10 +444,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const oldPurchase = purchases.find(p => p.id === id);
     if (!oldPurchase) return;
 
-    if (oldPurchase.payment_source === 'advance_transfer' && oldPurchase.advance_batch_id && oldPurchase.advance_batch_id !== 'auto_fifo') {
+    // Rollback batch lama jika sebelumnya memakai batch tertentu
+    if ((oldPurchase.payment_source === 'advance_transfer' || oldPurchase.payment_source === 'advance_cash') && oldPurchase.advance_batch_id && oldPurchase.advance_batch_id !== 'auto_fifo') {
       setAdvanceBatches(prev => prev.map(b => {
         if (b.id === oldPurchase.advance_batch_id) {
-          return { ...b, remaining_amount: b.remaining_amount + oldPurchase.total_amount, status: 'active' };
+          const restored = Math.round(b.remaining_amount + oldPurchase.total_amount);
+          return { ...b, remaining_amount: restored, status: 'active' };
         }
         return b;
       }));
@@ -449,10 +457,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const newPurchase = { ...oldPurchase, ...updatedData };
 
-    if (newPurchase.payment_source === 'advance_transfer' && newPurchase.advance_batch_id && newPurchase.advance_batch_id !== 'auto_fifo') {
+    // Potong batch baru jika memakai batch tertentu
+    if ((newPurchase.payment_source === 'advance_transfer' || newPurchase.payment_source === 'advance_cash') && newPurchase.advance_batch_id && newPurchase.advance_batch_id !== 'auto_fifo') {
       setAdvanceBatches(prev => prev.map(b => {
         if (b.id === newPurchase.advance_batch_id) {
-          const newRem = Math.max(0, b.remaining_amount - newPurchase.total_amount);
+          const newRem = Math.max(0, Math.round(b.remaining_amount - newPurchase.total_amount));
           return { ...b, remaining_amount: newRem, status: newRem === 0 ? 'depleted' : 'active' };
         }
         return b;
@@ -493,15 +502,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }));
         await client.from('purchase_items').insert(itemsToInsert);
       }
+
+      // Sync saldo batch ke Supabase
+      if (oldPurchase.advance_batch_id && oldPurchase.advance_batch_id !== 'auto_fifo') {
+        const oldB = advanceBatches.find(b => b.id === oldPurchase.advance_batch_id);
+        if (oldB) {
+          const restored = Math.round(oldB.remaining_amount + oldPurchase.total_amount);
+          await client.from('advance_fund_batches').update({
+            remaining_amount: restored,
+            status: 'active'
+          }).eq('id', oldPurchase.advance_batch_id);
+        }
+      }
+
+      if (newPurchase.advance_batch_id && newPurchase.advance_batch_id !== 'auto_fifo') {
+        const newB = advanceBatches.find(b => b.id === newPurchase.advance_batch_id);
+        if (newB) {
+          const newRem = Math.max(0, Math.round(newB.remaining_amount - newPurchase.total_amount));
+          await client.from('advance_fund_batches').update({
+            remaining_amount: newRem,
+            status: newRem === 0 ? 'depleted' : 'active'
+          }).eq('id', newPurchase.advance_batch_id);
+        }
+      }
     }
   };
 
   const deletePurchase = async (id: string) => {
     const target = purchases.find(p => p.id === id);
-    if (target && target.payment_source === 'advance_transfer' && target.advance_batch_id && target.advance_batch_id !== 'auto_fifo') {
+    if (target && (target.payment_source === 'advance_transfer' || target.payment_source === 'advance_cash') && target.advance_batch_id && target.advance_batch_id !== 'auto_fifo') {
       setAdvanceBatches(prev => prev.map(b => {
         if (b.id === target.advance_batch_id) {
-          const restored = b.remaining_amount + target.total_amount;
+          const restored = Math.round(b.remaining_amount + target.total_amount);
           return {
             ...b,
             remaining_amount: restored,
@@ -519,6 +551,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await client.from('purchase_items').delete().eq('purchase_id', id);
       const { error } = await client.from('purchases').delete().eq('id', id);
       if (error) console.error('Supabase deletePurchase error:', error);
+
+      if (target && (target.payment_source === 'advance_transfer' || target.payment_source === 'advance_cash') && target.advance_batch_id && target.advance_batch_id !== 'auto_fifo') {
+        const b = advanceBatches.find(batch => batch.id === target.advance_batch_id);
+        if (b) {
+          const restored = Math.round(b.remaining_amount + target.total_amount);
+          await client.from('advance_fund_batches').update({
+            remaining_amount: restored,
+            status: 'active'
+          }).eq('id', target.advance_batch_id);
+        }
+      }
     }
   };
 

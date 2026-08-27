@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { PurchaseItem, PaymentSource } from '@/types/database';
-import { formatRupiah } from '@/lib/formatters';
+import { formatRupiah, getLocalDateString, parseNumberInput } from '@/lib/formatters';
+import { compressReceiptImage } from '@/lib/imageCompressor';
 import {
   X,
   Plus,
@@ -11,7 +12,8 @@ import {
   AlertCircle,
   Calculator,
   ArrowRight,
-  Camera
+  Camera,
+  Calendar
 } from 'lucide-react';
 
 interface PurchaseFormModalProps {
@@ -31,23 +33,31 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   const [outletId, setOutletId] = useState<string>('');
   const [supplierId, setSupplierId] = useState<string>('');
   const [supplierName, setSupplierName] = useState<string>('Pasar Tradisional / Supplier');
-  const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [purchaseDate, setPurchaseDate] = useState<string>(getLocalDateString());
   const [paymentSource, setPaymentSource] = useState<PaymentSource>('advance_transfer');
   const [advanceBatchId, setAdvanceBatchId] = useState<string>('auto_fifo');
   const [isTempo, setIsTempo] = useState<boolean>(false);
   const [tempoDays, setTempoDays] = useState<number>(14);
-  const [tempoDueDate, setTempoDueDate] = useState<string>(
-    new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  );
+  const [tempoDueDate, setTempoDueDate] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const handleReceiptImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReceiptImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => setReceiptImage(reader.result as string);
-    reader.readAsDataURL(file);
+    try {
+      setIsCompressing(true);
+      const compressed = await compressReceiptImage(file, 1200, 0.72);
+      setReceiptImage(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onloadend = () => setReceiptImage(reader.result as string);
+      reader.readAsDataURL(file);
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const [items, setItems] = useState<PurchaseItem[]>([
@@ -56,11 +66,12 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
   // Sync outletId default saat outlets selesai dimuat atau modal dibuka
   useEffect(() => {
+    const today = getLocalDateString();
     if (initialData) {
       setOutletId(initialData.outlet_id || (outlets[0]?.id || ''));
       setSupplierId(initialData.supplier_id || '');
       setSupplierName(initialData.supplier_name || 'Pasar Tradisional / Supplier');
-      setPurchaseDate(initialData.purchase_date || new Date().toISOString().split('T')[0]);
+      setPurchaseDate(initialData.purchase_date || today);
       setPaymentSource(initialData.payment_source || 'advance_transfer');
       setAdvanceBatchId(initialData.advance_batch_id || 'auto_fifo');
       setIsTempo(Boolean(initialData.is_tempo));
@@ -75,7 +86,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       setOutletId(defaultId);
       setSupplierId('');
       setSupplierName('Pasar Tradisional / Supplier');
-      setPurchaseDate(new Date().toISOString().split('T')[0]);
+      setPurchaseDate(today);
       setPaymentSource('advance_transfer');
       setAdvanceBatchId('auto_fifo');
       setIsTempo(false);
@@ -92,9 +103,9 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     const item = { ...updated[index], [field]: value };
 
     if (field === 'quantity') {
-      item.quantity = Number(value) || 0;
+      item.quantity = parseNumberInput(value);
     } else if (field === 'unit_price') {
-      const p = Number(value) || 0;
+      const p = parseNumberInput(value);
       item.unit_price = p;
       // Harga adalah subtotal langsung sesuai nota (tidak dikalikan qty)
       item.subtotal = p;
@@ -126,6 +137,13 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
         }
       }, 50);
     }
+  };
+
+  // Shortcut tombol cepat tanggal (Kemarin / Hari Ini)
+  const setQuickDate = (offsetDays: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    setPurchaseDate(getLocalDateString(d));
   };
 
   // Keyboard shortcut: Alt+A atau Ctrl+Shift+A untuk tambah baris kapan saja
@@ -172,6 +190,7 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     const finalSupplierName = supplierName.trim() || 'Pasar Tradisional / Supplier';
     const validItems = items.filter(it => it.item_name.trim() !== '');
@@ -197,13 +216,17 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       items: validItems,
     };
 
-    if (initialData) {
-      await updatePurchase(initialData.id, payload);
-    } else {
-      await addPurchase(payload);
+    setIsSubmitting(true);
+    try {
+      if (initialData) {
+        await updatePurchase(initialData.id, payload);
+      } else {
+        await addPurchase(payload);
+      }
+      onClose();
+    } finally {
+      setIsSubmitting(false);
     }
-
-    onClose();
   };
 
   return (
@@ -254,9 +277,29 @@ export const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-black text-black uppercase mb-1">
-                Tanggal Pembelian <span className="text-red-600">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-black text-black uppercase">
+                  Tanggal Pembelian <span className="text-red-600">*</span>
+                </label>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setQuickDate(-1)}
+                    className="text-[10px] font-black uppercase px-1.5 py-0.5 border border-black bg-white hover:bg-slate-100"
+                    title="Isi tanggal kemarin"
+                  >
+                    Kemarin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickDate(0)}
+                    className="text-[10px] font-black uppercase px-1.5 py-0.5 border border-black bg-[#FFE600] hover:bg-[#ffd900]"
+                    title="Isi tanggal hari ini"
+                  >
+                    Hari Ini
+                  </button>
+                </div>
+              </div>
               <input
                 type="date"
                 value={purchaseDate}

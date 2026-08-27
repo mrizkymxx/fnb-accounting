@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { formatRupiah, formatDateIndo, getDaysRemaining } from '@/lib/formatters';
+import { compressReceiptImage } from '@/lib/imageCompressor';
 import { exportTempoCSV } from '@/lib/exportUtils';
 import {
   CheckCircle2,
@@ -24,6 +25,8 @@ export const TempoManagerView: React.FC<TempoManagerViewProps> = ({ onViewReceip
   const [searchQuery, setSearchQuery] = useState('');
   const [payingPurchaseId, setPayingPurchaseId] = useState<string | null>(null);
   const [proofImage, setProofImage] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const tempoPurchases = purchases.filter(p => {
     if (!p.is_tempo) return false;
@@ -45,29 +48,43 @@ export const TempoManagerView: React.FC<TempoManagerViewProps> = ({ onViewReceip
     .filter(p => p.is_tempo && p.tempo_status === 'unpaid' && (selectedOutletId === 'all' || p.outlet_id === selectedOutletId))
     .reduce((acc, p) => acc + p.total_amount, 0);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProofImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      setIsCompressing(true);
+      const compressed = await compressReceiptImage(file, 1200, 0.72);
+      setProofImage(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProofImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const handleConfirmPayTempo = async (purchaseId: string) => {
-    await updateTempoStatus(purchaseId, 'paid', proofImage || undefined);
-    setPayingPurchaseId(null);
-    setProofImage(null);
-
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
-      confetti({
-        particleCount: 70,
-        spread: 50,
-        origin: { y: 0.6 }
-      });
-    } catch {}
+      await updateTempoStatus(purchaseId, 'paid', proofImage || undefined);
+      setPayingPurchaseId(null);
+      setProofImage(null);
+
+      try {
+        confetti({
+          particleCount: 70,
+          spread: 50,
+          origin: { y: 0.6 }
+        });
+      } catch {}
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

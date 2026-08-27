@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
-import { formatRupiah, formatDateIndo } from '@/lib/formatters';
+import { formatRupiah, formatDateIndo, getLocalDateString, parseNumberInput } from '@/lib/formatters';
 import {
   X,
   Calculator,
@@ -26,19 +26,26 @@ export const CashSettlementModal: React.FC<CashSettlementModalProps> = ({
 }) => {
   const { outlets, purchases } = useApp();
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const [outletId, setOutletId] = useState<string>(
-    outlets[0]?.id || ''
-  );
-  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [outletId, setOutletId] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>(getLocalDateString());
   const [openingCash, setOpeningCash] = useState<number>(0);
 
   // Sync outletId saat outlets selesai dimuat atau berubah
   React.useEffect(() => {
-    if (!outletId && outlets.length > 0) {
-      setOutletId(outlets[0].id);
+    if (isOpen) {
+      if (!outletId && outlets.length > 0) {
+        setOutletId(outlets[0].id);
+      }
+      setSelectedDate(getLocalDateString());
     }
-  }, [outlets, outletId]);
+  }, [isOpen, outlets, outletId]);
+
+  // Shortcut tombol cepat tanggal (Kemarin / Hari Ini)
+  const setQuickDate = (offsetDays: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    setSelectedDate(getLocalDateString(d));
+  };
 
   const matchedPurchases = useMemo(() => {
     return purchases.filter(p => {
@@ -102,9 +109,27 @@ export const CashSettlementModal: React.FC<CashSettlementModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-[11px] font-black text-black uppercase mb-1">
-                Tanggal Belanja <span className="text-red-600">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-black text-black uppercase">
+                  Tanggal Belanja <span className="text-red-600">*</span>
+                </label>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setQuickDate(-1)}
+                    className="text-[9px] font-black uppercase px-1 py-0.2 border border-black bg-white hover:bg-slate-100"
+                  >
+                    Kemarin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickDate(0)}
+                    className="text-[9px] font-black uppercase px-1 py-0.2 border border-black bg-[#FFE600]"
+                  >
+                    Hari Ini
+                  </button>
+                </div>
+              </div>
               <input
                 type="date"
                 value={selectedDate}
